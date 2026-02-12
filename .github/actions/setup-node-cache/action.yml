@@ -1,0 +1,44 @@
+name: Setup Node.js with Cache
+description: Sets up Node.js with npm cache to speed up dependency installation
+
+inputs:
+  node-version:
+    description: Node.js version to use (e.g., "20.x" or path to .nvmrc)
+    required: false
+    default: 24.11.1
+  working-directory:
+    description: Working directory for npm operations
+    required: false
+    default: .
+  cache-key-prefix:
+    description: Prefix for cache key (useful for differentiating caches)
+    required: false
+    default: "node"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: "npm"
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+    - name: Cache Dependencies
+      uses: actions/cache@v4
+      id: cache
+      with:
+        path: |
+          ${{ inputs.working-directory }}/node_modules
+          ~/.npm
+        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-
+          ${{ runner.os }}-node-
+
+    - name: Install Dependencies
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm ci

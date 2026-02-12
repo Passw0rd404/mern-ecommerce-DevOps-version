@@ -32,18 +32,24 @@ About This Course:
 PORT=5000
 MONGO_URI=your_mongo_uri
 
-UPSTASH_REDIS_URL=your_redis_url
+REDIS_URL=your_redis_url
 
 ACCESS_TOKEN_SECRET=your_access_token_secret
 REFRESH_TOKEN_SECRET=your_refresh_token_secret
 
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-
 STRIPE_SECRET_KEY=your_stripe_secret_key
 CLIENT_URL=http://localhost:5173
 NODE_ENV=development
+
+VITE_API_URL=the-nlb-dns
+
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=your_bucket_name
+
+OTEL_EXPORTER_OTLP_ENDPOINT=http://your-collector:4318/v1/traces
+OTEL_SERVICE_NAME=ecommerce-backend
 ```
 
 ### Run this app locally
