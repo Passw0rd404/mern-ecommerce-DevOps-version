@@ -1,0 +1,34 @@
+name: Terraform apply
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: '1.7.0'
+  WORKING_DIR: './infrastructure-live-v1'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -input=false
+        working-directory: ${{ env.WORKING_DIR }}

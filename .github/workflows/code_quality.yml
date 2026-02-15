@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Step 1: Checkout Code
+      # Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Step 2 & 3: Setup Environment with Caching (Root)
+      # Setup Environment with Caching (Root)
       - name: Setup Node.js and Cache (Root)
         uses: ./.github/actions/setup-node-cache
         with:
@@ -22,7 +22,7 @@ jobs:
           working-directory: '.'
           cache-key-prefix: 'root'
 
-      # Step 2 & 3: Setup Environment with Caching (Frontend)
+      # Setup Environment with Caching (Frontend)
       - name: Setup Node.js and Cache (Frontend)
         uses: ./.github/actions/setup-node-cache
         with:
@@ -30,12 +30,12 @@ jobs:
           working-directory: 'frontend'
           cache-key-prefix: 'frontend'
 
-      # Step 4: Linting (Frontend)
+      # Linting
       - name: Run ESLint
         run: npm run lint
         continue-on-error: false
 
-      # Step 4: Linting (Frontend)
+      # Linting (Frontend)
       - name: Run ESLint
         run: npm run lint --prefix frontend
         continue-on-error: false
