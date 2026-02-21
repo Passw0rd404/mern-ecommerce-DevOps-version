@@ -1,0 +1,83 @@
+name: Terraform apply
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: '1.7.0'
+  WORKING_DIR: './infrastructure-live-v1'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.WORKING_DIR }}
+        continue-on-error: true
+      
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ${{ env.WORKING_DIR }}
+      
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.WORKING_DIR }}
+      
+      - name: TFLint Setup
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      
+      - name: TFLint Init
+        run: tflint --init
+        working-directory: ${{ env.WORKING_DIR }}
+      
+      - name: TFLint
+        id: tflint
+        run: tflint -f compact
+        working-directory: ${{ env.WORKING_DIR }}
+        continue-on-error: true
+      
+      - name: Terrascan Security Scan
+        id: terrascan
+        uses: tenable/terrascan-action@v1.5.0
+        with:
+          iac_type: 'terraform'
+          iac_dir: ${{ env.WORKING_DIR }}
+          policy_type: 'all'
+          only_warn: true
+      
+      - name: Checkov Security Scan
+        id: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: ${{ env.WORKING_DIR }}
+          framework: terraform
+          output_format: cli
+          soft_fail: true
+      
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -input=false
+        working-directory: ${{ env.WORKING_DIR }}
+      
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+        working-directory: ${{ env.WORKING_DIR }}

@@ -1,0 +1,57 @@
+name: Build and Ship to S3 and Deploy the Frontend
+
+on:
+  release:
+    types: [published, created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ship-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Define the Version Name
+      - name: Set Version
+        id: vars
+        run: |
+          # Uses the tag name if available, otherwise the short SHA
+          echo "VERSION=${{ github.event.release.tag_name || github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Setup and cache for root
+      - name: Setup Node.js and Cache (Root)
+        uses: ./.github/actions/setup-node-cache
+        with:
+          working-directory: '.'
+          cache-key-prefix: 'root'
+
+      # Configure AWS
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Create backend artifact
+      - name: Create Backend Artifact
+        run: |
+          mkdir -p deploy
+          cp -r backend deploy/
+          cp -r node_modules deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          [ -f tracing.js ] && cp tracing.js deploy/ || true
+          cd deploy
+          tar -czf ../backend-artifact.tar.gz .
+          cd ..
+        
+      # Ship backend to S3
+      - name: Ship Backend to S3
+        run: |
+          aws s3 cp backend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/artifacts/backend-${{ github.event.release.tag_name || github.sha }}.tar.gz  

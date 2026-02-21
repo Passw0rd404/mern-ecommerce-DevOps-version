@@ -1,0 +1,92 @@
+name: Code Quality & Testing
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Setup Environment with Caching (Root)
+      - name: Setup Node.js and Cache (Root)
+        uses: ./.github/actions/setup-node-cache
+        with:
+          node-version: '24.11.1'
+          working-directory: '.'
+          cache-key-prefix: 'root'
+
+      # Setup Environment with Caching (Frontend)
+      - name: Setup Node.js and Cache (Frontend)
+        uses: ./.github/actions/setup-node-cache
+        with:
+          node-version: '24.11.1'
+          working-directory: 'frontend'
+          cache-key-prefix: 'frontend'
+
+      # Linting
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: false
+
+      # Linting (Frontend)
+      - name: Run ESLint
+        run: npm run lint --prefix frontend
+        continue-on-error: false
+
+      # Step 5: Security Scan - npm audit (Root)
+      - name: Security Audit - Root
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      # Step 5: Security Scan - npm audit (Frontend)
+      - name: Security Audit - Frontend
+        run: npm audit --audit-level=moderate --prefix frontend
+        continue-on-error: true
+
+      # Step 5: Security Scan - Semgrep SAST
+      - name: Semgrep Security Scan
+        if: (github.actor != 'dependabot[bot]')
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/nodejs
+            p/javascript
+            p/react
+            p/eslint
+        continue-on-error: true
+
+  # OpenSSF Scorecard - Runs separately to assess security posture
+  scorecard:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard
+        uses: ossf/scorecard-action@v2.4.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      # Upload results to GitHub Security tab
+      - name: Upload Scorecard Results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

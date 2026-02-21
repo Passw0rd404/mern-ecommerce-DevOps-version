@@ -1,5 +1,5 @@
 import { redis } from "../lib/redis.js";
-import cloudinary from "../lib/cloudinary.js";
+import { uploadToS3, deleteFromS3 } from "../lib/s3.js";
 import Product from "../models/product.model.js";
 
 export const getAllProducts = async (req, res) => {
@@ -43,17 +43,17 @@ export const createProduct = async (req, res) => {
 	try {
 		const { name, description, price, image, category } = req.body;
 
-		let cloudinaryResponse = null;
+		let imageUrl = "";
 
 		if (image) {
-			cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
+			imageUrl = await uploadToS3(image);
 		}
 
 		const product = await Product.create({
 			name,
 			description,
 			price,
-			image: cloudinaryResponse?.secure_url ? cloudinaryResponse.secure_url : "",
+			image: imageUrl,
 			category,
 		});
 
@@ -73,13 +73,7 @@ export const deleteProduct = async (req, res) => {
 		}
 
 		if (product.image) {
-			const publicId = product.image.split("/").pop().split(".")[0];
-			try {
-				await cloudinary.uploader.destroy(`products/${publicId}`);
-				console.log("deleted image from cloduinary");
-			} catch (error) {
-				console.log("error deleting image from cloduinary", error);
-			}
+			await deleteFromS3(product.image);
 		}
 
 		await Product.findByIdAndDelete(req.params.id);

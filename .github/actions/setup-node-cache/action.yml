@@ -1,0 +1,46 @@
+name: Setup Node.js with Optimized Cache
+description: Sets up Node.js and handles multi-layer caching (npm & build artifacts)
+
+inputs:
+  node-version:
+    description: "Node.js version"
+    required: false
+    default: "24.x" # Using .x for latest LTS 24
+  working-directory:
+    description: "Directory containing package.json"
+    required: false
+    default: "."
+  cache-key-prefix:
+    description: "Prefix for cache differentiation"
+    required: false
+    default: "node"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        # We handle the global ~/.npm cache here natively
+        cache: "npm"
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+    - name: Cache Node Modules & Build Cache
+      uses: actions/cache@v4
+      id: node-cache
+      with:
+        path: |
+          ${{ inputs.working-directory }}/node_modules
+          ${{ inputs.working-directory }}/node_modules/.cache
+        # Key includes OS, Prefix, and Lockfile hash
+        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-
+
+    - name: Install Dependencies
+      # Only run if node_modules wasn't restored
+      if: steps.node-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm ci

@@ -10,17 +10,24 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
-		"react": "^18.3.1",
-		"react-dom": "^18.3.1",
+		"@opentelemetry/auto-instrumentations-node": "^0.69.0",
+		"@opentelemetry/exporter-logs-otlp-http": "^0.211.0",
+		"@opentelemetry/exporter-metrics-otlp-http": "^0.211.0",
+		"@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
+		"@opentelemetry/instrumentation-winston": "^0.55.0",
+		"@opentelemetry/sdk-node": "^0.211.0",
+		"@stripe/stripe-js": "^4.3.0",
+		"axios": "^1.7.5",
+		"framer-motion": "^11.3.30",
 		"lucide-react": "^0.435.0",
+		"react": "^18.3.1",
 		"react-confetti": "^6.1.0",
+		"react-dom": "^18.3.1",
 		"react-hot-toast": "^2.4.1",
 		"react-router-dom": "^6.26.1",
 		"recharts": "^2.12.7",
-		"framer-motion": "^11.3.30",
-		"zustand": "^4.5.5",
-		"@stripe/stripe-js": "^4.3.0",
-		"axios": "^1.7.5"
+		"winston": "^3.19.0",
+		"zustand": "^4.5.5"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.9.0",
