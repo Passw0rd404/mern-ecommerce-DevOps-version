@@ -1,0 +1,87 @@
+name: Build and Ship to S3 and Deploy the Frontend
+
+on:
+  release:
+    types: [published, created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ship-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Define the Version Name (Tag or SHA)
+      - name: Set Version
+        id: vars
+        run: |
+          echo "VERSION=${{ github.event.release.tag_name || github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js and Cache
+      - name: Setup Node.js and Cache (Frontend)
+        uses: ./.github/actions/setup-node-cache
+        with:
+          working-directory: 'frontend'
+          cache-key-prefix: 'frontend'
+
+      # 3. Build Frontend (Note: No VITE_API_URL as requested)
+      # Ensure your frontend uses relative paths (e.g., axios.get('/api/user'))
+      - name: Build Frontend
+        run: npm run build --prefix frontend
+        env:
+          NODE_ENV: production
+
+      # 4. Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 5. Upload to a versioned folder in S3
+      - name: Deploy Frontend to S3 (Versioned)
+        run: |
+          aws s3 sync frontend/dist s3://${{ secrets.LIVE_FRONTEND_BUCKET_NAME }}/${{ steps.vars.outputs.VERSION }} --delete
+
+      # 6. ATOMIC SWITCH: Update CloudFront Origin Path
+      - name: Update CloudFront Origin Path
+        run: |
+          # Get the current config and the ETag (version ID of the config)
+          aws cloudfront get-distribution-config --id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} > full_config.json
+          ETAG=$(jq -r '.ETag' full_config.json)
+
+          # Extract the actual config part for modification
+          jq '.DistributionConfig' full_config.json > config.json
+
+          # Update only the OriginPath for your S3 Origin ID
+          jq --arg VERSION "/${{ steps.vars.outputs.VERSION }}" \
+             --arg ORIGIN_ID "${{ secrets.CLOUDFRONT_S3_ORIGIN_ID }}" \
+             '(.Origins.Items[] | select(.Id == $ORIGIN_ID)).OriginPath = $VERSION' \
+             config.json > updated_config.json
+
+          # Push the update back to AWS
+          aws cloudfront update-distribution \
+            --id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --if-match $ETAG \
+            --distribution-config file://updated_config.json
+
+      # 7. Invalidate the Cache (So users see the new version immediately)
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      # 8. Archive the build as a tarball (Insurance)
+      - name: Create and Ship Artifact
+        run: |
+          cd frontend/dist
+          tar -czf ../../frontend-artifact.tar.gz .
+          cd ../..
+          aws s3 cp frontend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/artifacts/frontend-${{ steps.vars.outputs.VERSION }}.tar.gz

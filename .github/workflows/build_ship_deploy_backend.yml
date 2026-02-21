@@ -9,34 +9,26 @@ permissions:
   contents: read
 
 jobs:
-  build-and-ship:
+  build-ship-deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # Define the Version Name
+      - name: Set Version
+        id: vars
+        run: |
+          # Uses the tag name if available, otherwise the short SHA
+          echo "VERSION=${{ github.event.release.tag_name || github.sha }}" >> $GITHUB_OUTPUT
+
       - name: Checkout Code
         uses: actions/checkout@v4
-      
+
       # Setup and cache for root
       - name: Setup Node.js and Cache (Root)
         uses: ./.github/actions/setup-node-cache
         with:
-          node-version: '20.x'
           working-directory: '.'
           cache-key-prefix: 'root'
-
-      # Setup and cache for frontend
-      - name: Setup Node.js and Cache (Frontend)
-        uses: ./.github/actions/setup-node-cache
-        with:
-          node-version: '20.x'
-          working-directory: 'frontend'
-          cache-key-prefix: 'frontend'
-
-      # Build frontend
-      - name: Build Frontend
-        run: npm run build --prefix frontend
-        env:
-          NODE_ENV: production
 
       # Configure AWS
       - name: Configure AWS Credentials
@@ -45,25 +37,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-
-      # DEPLOY UNZIPPED TO LIVE BUCKET (This is what CloudFront sees)
-      - name: Deploy Frontend to Live S3
-        run: |
-          aws s3 sync frontend/dist s3://${{ secrets.LIVE_FRONTEND_BUCKET_NAME }} --delete
-
-      # TELL CLOUDFRONT TO REFRESH (Crucial!)
-      - name: Invalidate CloudFront Cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
-
-      # Create frontend artifact
-      - name: Create Frontend Artifact
-        run: |
-          cd frontend/dist
-          tar -czf ../../frontend-artifact.tar.gz .
-          cd ../..
 
       # Create backend artifact
       - name: Create Backend Artifact
@@ -77,12 +50,7 @@ jobs:
           cd deploy
           tar -czf ../backend-artifact.tar.gz .
           cd ..
-
-      # Ship frontend to S3
-      - name: Ship Frontend to S3
-        run: |
-          aws s3 cp frontend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/artifacts/frontend-${{ github.event.release.tag_name || github.sha }}.tar.gz
-
+        
       # Ship backend to S3
       - name: Ship Backend to S3
         run: |
