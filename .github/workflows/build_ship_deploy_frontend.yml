@@ -84,4 +84,4 @@ jobs:
           cd frontend/dist
           tar -czf ../../frontend-artifact.tar.gz .
           cd ../..
-          aws s3 cp frontend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/artifacts/frontend-${{ steps.vars.outputs.VERSION }}.tar.gz
+          aws s3 cp frontend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/frontend/frontend-${{ steps.vars.outputs.VERSION }}.tar.gz

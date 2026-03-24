@@ -42,6 +42,8 @@ jobs:
       - name: Create Backend Artifact
         run: |
           mkdir -p deploy
+          cp -r scripts deploy/
+          cp appspec.yml deploy/
           cp -r backend deploy/
           cp -r node_modules deploy/
           cp package.json deploy/
@@ -54,4 +56,19 @@ jobs:
       # Ship backend to S3
       - name: Ship Backend to S3
         run: |
-          aws s3 cp backend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/artifacts/backend-${{ github.event.release.tag_name || github.sha }}.tar.gz  
+          # We define the key once to avoid typos
+          ARTIFACT_KEY="backend/backend-${{ github.event.release.tag_name || github.sha }}.tar.gz"
+          
+          aws s3 cp backend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/$ARTIFACT_KEY
+
+      # TRIGGER CODETEPLOY
+      - name: Create CodeDeploy Deployment
+        run: |
+          ARTIFACT_KEY="backend/backend-${{ github.event.release.tag_name || github.sha }}.tar.gz"
+          
+          aws deploy create-deployment \
+            --application-name ${{ secrets.CODEDEPLOY_APP_NAME }} \
+            --deployment-group-name ${{ secrets.CODEDEPLOY_GROUP_NAME }} \
+            --s3-location bucket=${{ secrets.S3_BUCKET_NAME }},key=$ARTIFACT_KEY,bundleType=tgz \
+            --file-exists-behavior OVERWRITE \
+            --description "Deploying version ${{ github.sha }}"

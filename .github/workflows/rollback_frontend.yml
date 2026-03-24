@@ -33,7 +33,7 @@ jobs:
         if: steps.check_files.outputs.exists == 'false'
         run: |
           echo "Version not found in Live bucket. Restoring from Artifacts..."
-          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/artifacts/frontend-${{ github.event.inputs.version }}.tar.gz .
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/frontend/frontend-${{ github.event.inputs.version }}.tar.gz .
           mkdir restore_dir
           tar -xzf frontend-${{ github.event.inputs.version }}.tar.gz -C restore_dir
           aws s3 sync restore_dir s3://${{ secrets.LIVE_FRONTEND_BUCKET_NAME }}/${{ github.event.inputs.version }} --delete

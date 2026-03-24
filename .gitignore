@@ -24,3 +24,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+*.tfstate
+*.lock.*
+terraform*
+.terraform*

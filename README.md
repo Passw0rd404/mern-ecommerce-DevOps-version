@@ -32,7 +32,10 @@ About This Course:
 PORT=5000
 MONGO_URI=your_mongo_uri
 
-REDIS_URL=your_redis_url
+REDIS_HOST=app-valkey.xxxx.cache.amazonaws.com
+REDIS_PORT=6379
+REDIS_PASSWORD=your-auth-token
+REDIS_TLS=true
 
 ACCESS_TOKEN_SECRET=your_access_token_secret
 REFRESH_TOKEN_SECRET=your_refresh_token_secret
