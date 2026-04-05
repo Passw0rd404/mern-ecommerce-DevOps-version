@@ -2,6 +2,9 @@
 
 ![Demo App](/frontend/public/screenshot-for-readme.png)
 
+![Alt text](./diagrams/3-tier.png)
+![Alt text](./diagrams/cicd.png)
+
 [Video Tutorial on Youtube](https://youtu.be/sX57TLIPNx8)
 
 About This Course:
