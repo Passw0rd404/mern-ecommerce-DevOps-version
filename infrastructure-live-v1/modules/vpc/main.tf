@@ -1,30 +1,52 @@
+data "aws_availability_zones" "available" {
+  state = "available"
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
+}
+
+data "aws_region" "current" {}
+
+locals {
+  azs = slice(data.aws_availability_zones.available.names, 0, var.az_num)
+
+  # AZ name -> position, for example { "eu-north-1a" = 0, "eu-north-1b" = 1 }
+  # Adding an AZ appends a new key, so existing resources are not touched.
+  az_index = { for i, az in local.azs : az => i }
+
+  # Automatic subnets (with a /16 VPC): public 10.0.0.0/24, 10.0.1.0/24 ...
+  # private 10.0.10.0/24, 10.0.11.0/24 ...
+  pub_cidrs = length(var.pub_cidrs) > 0 ? var.pub_cidrs : [for i in range(var.az_num) : cidrsubnet(var.vpc_cidr, 8, i)]
+  prv_cidrs = length(var.prv_cidrs) > 0 ? var.prv_cidrs : [for i in range(var.az_num) : cidrsubnet(var.vpc_cidr, 8, i + 10)]
+
+  # Which AZs get a NAT gateway
+  nat_azs = var.single_nat_gateway ? [local.azs[0]] : local.azs
+}
+
 # VPC
 resource "aws_vpc" "main" {
-  cidr_block           = var.vpc
+  cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
-    Name = "main-vpc"
-  }
+  tags = { Name = "main-vpc" }
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
-    Name = "main-igw"
-  }
+  tags = { Name = "main-igw" }
 }
 
-# Public Subnets
+# Subnets: one public and one private per AZ
 resource "aws_subnet" "pub" {
-  for_each = toset(local.azs)
+  for_each = local.az_index
+
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.pub_cidrs[index(local.azs, each.key)]
-  availability_zone       = each.value
-  map_public_ip_on_launch = true
+  cidr_block              = local.pub_cidrs[each.value]
+  availability_zone       = each.key
+  map_public_ip_on_launch = false
 
   tags = {
     Name = "pub-subnet-${each.key}"
@@ -32,12 +54,12 @@ resource "aws_subnet" "pub" {
   }
 }
 
-# Private Subnets
 resource "aws_subnet" "prv" {
-  for_each = toset(local.azs)
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.prv_cidrs[index(local.azs, each.key)]
-  availability_zone       = each.value
+  for_each = local.az_index
+
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = local.prv_cidrs[each.value]
+  availability_zone = each.key
 
   tags = {
     Name = "prv-subnet-${each.key}"
@@ -45,22 +67,27 @@ resource "aws_subnet" "prv" {
   }
 }
 
-# Route Table for Private Subnets
-resource "aws_route_table" "prv" {
-  for_each = toset(local.azs)
-  vpc_id = aws_vpc.main.id
+# NAT gateways (one per AZ, or a single one when single_nat_gateway = true)
+resource "aws_eip" "nat" {
+  for_each = toset(local.nat_azs)
 
-  route {
-    cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat[each.key].id
-  }
+  domain = "vpc"
 
-  tags = {
-    Name = "prv-route-table"
-  }
+  tags = { Name = "nat-eip-${each.key}" }
 }
 
-# Route Table for Public Subnets
+resource "aws_nat_gateway" "nat" {
+  for_each = toset(local.nat_azs)
+
+  allocation_id = aws_eip.nat[each.key].id
+  subnet_id     = aws_subnet.pub[each.key].id
+
+  tags = { Name = "nat-${each.key}" }
+
+  depends_on = [aws_internet_gateway.main]
+}
+
+# Public route table (shared by all public subnets)
 resource "aws_route_table" "pub" {
   vpc_id = aws_vpc.main.id
 
@@ -69,127 +96,41 @@ resource "aws_route_table" "pub" {
     gateway_id = aws_internet_gateway.main.id
   }
 
-  tags = {
-    Name = "pub-route-table"
-  }
+  tags = { Name = "pub-rt" }
 }
 
-# Route Table Association for Public Subnets
 resource "aws_route_table_association" "pub" {
-  for_each = toset(local.azs)
+  for_each = local.az_index
+
   subnet_id      = aws_subnet.pub[each.key].id
   route_table_id = aws_route_table.pub.id
 }
 
-# Route Table Association for Private Subnets
+# Private route tables (one per AZ, each pointing to its own or the shared NAT)
+resource "aws_route_table" "prv" {
+  for_each = local.az_index
+
+  vpc_id = aws_vpc.main.id
+
+  tags = { Name = "prv-rt-${each.key}" }
+}
+
+resource "aws_route" "prv_nat" {
+  for_each = local.az_index
+
+  route_table_id         = aws_route_table.prv[each.key].id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat[var.single_nat_gateway ? local.azs[0] : each.key].id
+}
+
 resource "aws_route_table_association" "prv" {
-  for_each = toset(local.azs)
+  for_each = local.az_index
+
   subnet_id      = aws_subnet.prv[each.key].id
   route_table_id = aws_route_table.prv[each.key].id
 }
 
-# Elastic ips For The Nats
-resource "aws_eip" "eip" {
-  for_each = toset(local.azs)
-  domain = "vpc"
-  tags = {
-    Name = "eip-${each.key}"
-  }
-}
-
-# Nat Gateways
-resource "aws_nat_gateway" "nat" {
-  for_each = toset(local.azs)
-  allocation_id = aws_eip.eip[each.key].id
-  subnet_id     = aws_subnet.pub[each.key].id
-
-  tags = {
-    Name = "nat-gateway-${each.key}"
-  }
-
-  depends_on = [aws_internet_gateway.main]
-}
-
-# Default Security Group - no ingress, allow all egress
+# Default security group: no rules at all (nothing should use it)
 resource "aws_default_security_group" "default" {
   vpc_id = aws_vpc.main.id
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# pub sg
-resource "aws_security_group" "pub" {
-  name        = "pub-sg"
-  description = "Security group for public resources"
-  vpc_id      = aws_vpc.main.id
-
-  tags = {
-    Name = "pub-sg"
-    Type = "Public"
-  }
-}
-
-resource "aws_vpc_security_group_ingress_rule" "pub_https" {
-  security_group_id = aws_security_group.pub.id
-  description       = "HTTPS from internet"
-  from_port         = 443
-  to_port           = 443
-  ip_protocol       = "tcp"
-  cidr_ipv4         = "0.0.0.0/0"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "pub_http" {
-  security_group_id = aws_security_group.pub.id
-  description       = "HTTP from internet"
-  from_port         = 80
-  to_port           = 80
-  ip_protocol       = "tcp"
-  cidr_ipv4         = "0.0.0.0/0"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "pub_ssh" {
-  security_group_id = aws_security_group.pub.id
-  description       = "SSH from my IP only"
-  from_port         = 22
-  to_port           = 22
-  ip_protocol       = "tcp"
-  cidr_ipv4         = local.my_ip  # your IP only
-}
-
-resource "aws_vpc_security_group_egress_rule" "pub_all" {
-  security_group_id = aws_security_group.pub.id
-  description       = "Allow all outbound"
-  ip_protocol       = "-1"
-  cidr_ipv4         = "0.0.0.0/0"
-}
-
-# prv sg
-resource "aws_security_group" "prv" {
-  name        = "prv-sg"
-  description = "Security group for private resources"
-  vpc_id      = aws_vpc.main.id
-
-  tags = {
-    Name = "prv-sg"
-    Type = "Private"
-  }
-}
-
-resource "aws_vpc_security_group_ingress_rule" "prv_from_pub" {
-  security_group_id            = aws_security_group.prv.id
-  description                  = "Allow all traffic from public SG"
-  ip_protocol                  = "-1"
-  referenced_security_group_id = aws_security_group.pub.id
-}
-
-resource "aws_vpc_security_group_egress_rule" "prv_all" {
-  security_group_id = aws_security_group.prv.id
-  description       = "Allow all outbound"
-  ip_protocol       = "-1"
-  cidr_ipv4         = "0.0.0.0/0"
 }

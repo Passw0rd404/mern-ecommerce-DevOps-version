@@ -39,6 +39,7 @@ REDIS_HOST=app-valkey.xxxx.cache.amazonaws.com
 REDIS_PORT=6379
 REDIS_PASSWORD=your-auth-token
 REDIS_TLS=true
+REDIS_MODE=cluster
 
 ACCESS_TOKEN_SECRET=your_access_token_secret
 REFRESH_TOKEN_SECRET=your_refresh_token_secret
@@ -68,4 +69,16 @@ npm run build
 
 ```shell
 npm run start
+```
+
+```
+GitHub secrets
+Secret	Value
+S3_BUCKET_NAME	mern-dev-<account-id>-artifacts (the s3 module's names changed)
+LIVE_FRONTEND_BUCKET_NAME	mern-dev-<account-id>-frontend
+CODEDEPLOY_APP_NAME / CODEDEPLOY_GROUP_NAME	backend-app / backend-deployment-group
+CLOUDFRONT_KVS_ARN (new)	terraform output kvs_arn
+SITE_URL (new)	https://<your-cloudfront-domain> or your own domain
+CLOUDFRONT_DISTRIBUTION_ID, CLOUDFRONT_S3_ORIGIN_ID	delete, nothing uses them now
+TF_API_TOKEN	delete, the S3 backend doesn't use it
 ```

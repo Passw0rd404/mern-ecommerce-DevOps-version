@@ -1,43 +1,53 @@
 #!/bin/bash
-set -e # Exit immediately if a command exits with a non-zero status
+set -euo pipefail
+
+NODE_MAJOR=24
 
 echo "--- Starting AMI Build ---"
-
-echo "SECRET_NAME=ecommerce/prod/backend" | sudo tee /etc/environment
 
 # 1. Update the OS
 sudo dnf update -y
 
-# 2. Install essential system tools (including jq)
-# These will now be "baked in" and available in your private subnet
+# 2. System tools (ruby and wget are needed by the CodeDeploy installer)
 sudo dnf install -y jq ruby wget git tar
 
-# 3. Install Node.js 20 (LTS)
-# Using NodeSource to ensure we get a specific version
-curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+# 3. Node.js (fail the build if we do not get the version we asked for)
+curl -fsSL "https://rpm.nodesource.com/setup_${NODE_MAJOR}.x" | sudo bash -
 sudo dnf install -y nodejs
+node -v | grep -q "^v${NODE_MAJOR}\." || { echo "Wrong Node version: $(node -v)"; exit 1; }
 
-# 4. Install PM2 globally
-# This ensures 'pm2' is in the PATH for the ec2-user later
+# 4. PM2
 sudo npm install -g pm2
 
-# 5. Install the CodeDeploy Agent
-# Note: We use the bucket for the specific region where the AMI is built
-REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-cd /home/ec2-user
-wget https://aws-codedeploy-${REGION}.s3.${REGION}.amazonaws.com/latest/install
+# 5. CodeDeploy agent (IMDSv2: get a token first, then the region)
+TOKEN=$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+REGION=$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/placement/region)
+
+cd /tmp
+wget "https://aws-codedeploy-${REGION}.s3.${REGION}.amazonaws.com/latest/install"
 chmod +x ./install
 sudo ./install auto
+rm -f ./install
 
-# 6. Verify Installations
+# 6. Verify everything
 echo "Verifying versions..."
 node -v
 npm -v
 pm2 -v
 jq --version
-sudo service codedeploy-agent status
+aws --version
+sudo systemctl is-active codedeploy-agent
 
-# 7. Enable CodeDeploy Agent to start on every boot
+# 7. Start on boot, but do not bake a running agent into the image
 sudo systemctl enable codedeploy-agent
+sudo systemctl stop codedeploy-agent
+
+# 8. Clean up
+sudo dnf clean all
+
+# NOTE: SECRET_NAME is not set here on purpose.
+# Set it at launch (launch template user data) so this AMI stays environment-neutral.
 
 echo "--- AMI Build Complete ---"

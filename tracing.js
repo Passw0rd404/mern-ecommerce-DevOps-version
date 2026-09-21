@@ -7,24 +7,16 @@ import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 
 const sdk = new NodeSDK({
-  serviceName: 'ecommerce-backend',
-  
-  traceExporter: new OTLPTraceExporter({
-    url: 'http://localhost:4318/v1/traces',
-  }),
+  serviceName: process.env.OTEL_SERVICE_NAME || 'ecommerce-backend',
+
+  traceExporter: new OTLPTraceExporter(),
 
   metricReader: new PeriodicExportingMetricReader({
-    exporter: new OTLPMetricExporter({
-      url: 'http://localhost:4318/v1/metrics',
-    }),
+    exporter: new OTLPMetricExporter(),
     exportIntervalMillis: 60000,
   }),
 
-  logRecordProcessor: new BatchLogRecordProcessor(
-    new OTLPLogExporter({
-      url: 'http://localhost:4318/v1/logs',
-    })
-  ),
+  logRecordProcessor: new BatchLogRecordProcessor(new OTLPLogExporter()),
 
   instrumentations: [getNodeAutoInstrumentations()],
 });

@@ -1,34 +1,66 @@
-name: Terraform apply
+name: Terraform destroy
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy-dev" to confirm'
+        required: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
 env:
-  TF_VERSION: '1.7.0'
-  WORKING_DIR: './infrastructure-live-v1'
+  TF_VERSION: '1.11.0'
+  WORKING_DIR: './infrastructure-live-v1/dev'
+  AWS_REGION: 'eu-north-1'
 
 jobs:
-  terraform:
+  destroy:
     runs-on: ubuntu-latest
-    
+
     steps:
+      - name: Check confirmation
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "destroy-dev" ]; then
+            echo "Confirmation text did not match. Nothing was destroyed."
+            exit 1
+          fi
+
       - name: Checkout Code
         uses: actions/checkout@v4
-      
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
 
       - name: Terraform Init
-        id: init
-        run: terraform init
+        run: terraform init -input=false
         working-directory: ${{ env.WORKING_DIR }}
 
+      - name: Remove the app bucket policy so the bucket can be emptied
+        run: |
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          aws s3api delete-bucket-policy --bucket "mern-dev-${ACCOUNT}-app" || true
+
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve -input=false
+        run: terraform destroy -auto-approve -input=false -lock-timeout=5m
         working-directory: ${{ env.WORKING_DIR }}
+        env:
+          MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
+          MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}

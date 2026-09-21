@@ -1,36 +1,38 @@
-name: Build and Ship to S3 and Deploy the Frontend
+name: Backend - Build and Deploy
 
 on:
   release:
-    types: [published, created]
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ github.event.release.tag_name || github.sha }}
+  S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+  CODEDEPLOY_APP_NAME: ${{ secrets.CODEDEPLOY_APP_NAME }}
+  CODEDEPLOY_GROUP_NAME: ${{ secrets.CODEDEPLOY_GROUP_NAME }}
+
 jobs:
-  build-ship-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
-      # Define the Version Name
-      - name: Set Version
-        id: vars
-        run: |
-          # Uses the tag name if available, otherwise the short SHA
-          echo "VERSION=${{ github.event.release.tag_name || github.sha }}" >> $GITHUB_OUTPUT
-
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Setup and cache for root
-      - name: Setup Node.js and Cache (Root)
-        uses: ./.github/actions/setup-node-cache
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          working-directory: '.'
-          cache-key-prefix: 'root'
+          node-version: '24.11.1'
+          cache: npm
 
-      # Configure AWS
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -38,37 +40,44 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Create backend artifact
-      - name: Create Backend Artifact
+      # Production dependencies are installed inside deploy/, so the cached
+      # root node_modules is never touched.
+      - name: Create backend artifact
         run: |
-          mkdir -p deploy
-          cp -r scripts deploy/
-          cp appspec.yml deploy/
-          cp -r backend deploy/
-          cp -r node_modules deploy/
-          cp package.json deploy/
-          cp package-lock.json deploy/
-          [ -f tracing.js ] && cp tracing.js deploy/ || true
-          cd deploy
-          tar -czf ../backend-artifact.tar.gz .
-          cd ..
-        
-      # Ship backend to S3
-      - name: Ship Backend to S3
-        run: |
-          # We define the key once to avoid typos
-          ARTIFACT_KEY="backend/backend-${{ github.event.release.tag_name || github.sha }}.tar.gz"
-          
-          aws s3 cp backend-artifact.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/$ARTIFACT_KEY
+          mkdir deploy
+          cp -r scripts backend deploy/
+          cp appspec.yml package.json package-lock.json ecosystem.config.cjs tracing.js deploy/
+          chmod +x deploy/scripts/*.sh
+          npm ci --omit=dev --prefix deploy
+          tar -czf backend-artifact.tar.gz -C deploy .
 
-      # TRIGGER CODETEPLOY
-      - name: Create CodeDeploy Deployment
+      # The bucket is versioned, so pin CodeDeploy to the exact object we upload
+      - name: Ship to S3 and start deployment
         run: |
-          ARTIFACT_KEY="backend/backend-${{ github.event.release.tag_name || github.sha }}.tar.gz"
-          
-          aws deploy create-deployment \
-            --application-name ${{ secrets.CODEDEPLOY_APP_NAME }} \
-            --deployment-group-name ${{ secrets.CODEDEPLOY_GROUP_NAME }} \
-            --s3-location bucket=${{ secrets.S3_BUCKET_NAME }},key=$ARTIFACT_KEY,bundleType=tgz \
+          KEY="backend/backend-${VERSION}.tar.gz"
+
+          VERSION_ID=$(aws s3api put-object \
+            --bucket "$S3_BUCKET_NAME" --key "$KEY" \
+            --body backend-artifact.tar.gz \
+            --query VersionId --output text)
+
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name "$CODEDEPLOY_APP_NAME" \
+            --deployment-group-name "$CODEDEPLOY_GROUP_NAME" \
+            --s3-location "bucket=$S3_BUCKET_NAME,key=$KEY,bundleType=tgz,version=$VERSION_ID" \
             --file-exists-behavior OVERWRITE \
-            --description "Deploying version ${{ github.sha }}"
+            --description "Backend $VERSION" \
+            --query deploymentId --output text)
+
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> "$GITHUB_ENV"
+          echo "Started deployment $DEPLOYMENT_ID"
+
+      - name: Wait for deployment
+        run: |
+          if ! aws deploy wait deployment-successful --deployment-id "$DEPLOYMENT_ID"; then
+            aws deploy get-deployment --deployment-id "$DEPLOYMENT_ID" \
+              --query 'deploymentInfo.{status:status,error:errorInformation,rollback:rollbackInfo}' \
+              --output json
+            exit 1
+          fi
+          echo "Deployment $DEPLOYMENT_ID succeeded"

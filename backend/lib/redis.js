@@ -1,39 +1,93 @@
+import "dotenv/config";
 import Redis from "ioredis";
-import dotenv from "dotenv";
 
-dotenv.config();
+const MODE = (process.env.REDIS_MODE || "standalone").toLowerCase();
+const HOST = process.env.REDIS_HOST;
+const PORT = Number(process.env.REDIS_PORT || 6379);
+const PASSWORD = process.env.REDIS_PASSWORD || undefined;
+const USE_TLS = process.env.REDIS_TLS === "true";
 
-export const redis = new Redis({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
+// wait longer after each failed try, max 2 seconds, never give up
+const backoff = (times) => Math.min(times * 200, 2000);
 
-  // TLS always on when password is set (ElastiCache requires it)
-  tls: process.env.REDIS_TLS === "true" ? {
-    rejectUnauthorized: true,   // verify AWS certificate
-  } : undefined,
+// settings used for every connection
+const nodeOptions = {
+	password: PASSWORD,
+	tls: USE_TLS ? {} : undefined,
+	connectTimeout: 10000,
+	commandTimeout: 5000,
+	maxRetriesPerRequest: 3,
+  // a replica that is still syncing answers LOADING: reconnect and resend the command
+	reconnectOnError: (err) => (err.message.includes("LOADING") ? 2 : false),
+};
 
-  retryStrategy(times) {
-    if (times > 3) {
-      console.error("Redis failed after 3 retries");
-      return null;             // stop retrying instead of infinite loop
-    }
-    return Math.min(times * 200, 2000);
-  },
+let client;
 
-  maxRetriesPerRequest: 3,     // fail fast per command
+if (MODE === "cluster") {
+	client = new Redis.Cluster([{ host: HOST, port: PORT }], {
+		lazyConnect: true,
+		// nodes[0] is the shard's primary, the rest are replicas.
+		// Refresh tokens are always read from the primary (replication is async, so a replica
+		// can lag). Every other read goes to a random replica. Writes always go to primaries.
+		scaleReads: (nodes, command) => {
+			const key = String(command.args[0] ?? "");
+			if (nodes.length === 1 || key.startsWith("refresh_token:")) return nodes[0];
+			return nodes[1 + Math.floor(Math.random() * (nodes.length - 1))];
+		},
+		clusterRetryStrategy: backoff,
+		maxRedirections: 16,
+		retryDelayOnFailover: 500,
+		retryDelayOnClusterDown: 500,
+		retryDelayOnTryAgain: 500,
+		slotsRefreshTimeout: 5000,
+		// needed for ElastiCache with TLS
+		dnsLookup: (address, callback) => callback(null, address),
+		redisOptions: nodeOptions,
+	});
+} else {
+	client = new Redis({
+		host: HOST,
+		port: PORT,
+		lazyConnect: true,
+		retryStrategy: backoff,
+		...nodeOptions,
+	});
+}
 
-  // handle connection events
-  lazyConnect: true,
-});
+// without this, a Redis error can crash the process
+client.on("error", (err) => console.error(`[redis:${MODE}] error:`, err.message));
+client.on("ready", () => console.log(`[redis:${MODE}] ready`));
 
-// event listeners for observability
-redis.on("connect", () => console.log("Redis connected"));
-redis.on("error", (err) => console.error("Redis error:", err.message));
+export const redis = client;
 
-// explicit connect so you catch startup errors early
-redis.connect().catch((err) => {
-  console.error("Redis initial connection failed:", err.message);
-});
+// connect at startup, but fail after a time limit instead of hanging forever
+export const connectRedis = async (timeoutMs = 30000) => {
+	const connecting = (async () => {
+		await client.connect();
+		await client.ping();
+	})();
+	connecting.catch(() => {});
 
-export default redis;
+	let timer;
+	const timeout = new Promise((_, reject) => {
+		timer = setTimeout(
+			() => reject(new Error(`Redis not reachable after ${timeoutMs / 1000}s`)),
+			timeoutMs
+		);
+	});
+
+	try {
+		await Promise.race([connecting, timeout]);
+	} finally {
+		clearTimeout(timer);
+	}
+	console.log(`Redis connected (mode: ${MODE})`);
+};
+
+export const isRedisHealthy = async () => {
+	try {
+		return (await client.ping()) === "PONG";
+	} catch {
+		return false;
+	}
+};

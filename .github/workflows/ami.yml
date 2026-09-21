@@ -1,4 +1,4 @@
-name: Terraform apply
+name: Build AMI
 
 on:
   workflow_dispatch:
@@ -7,9 +7,8 @@ permissions:
   contents: read
 
 env:
-  PKR_VERSION: '1.8.0'
   WORKING_DIR: './infrastructure-live-v1/packer'
-  REGION: 'eu-north-1'
+  AWS_REGION: 'eu-north-1'
 
 jobs:
   validate-packer:
@@ -25,13 +24,16 @@ jobs:
           version: latest
 
       - name: Packer Init
-        run: packer init ${{ env.WORKING_DIR }}
-
-      - name: Packer Validate
-        run: packer validate ${{ env.WORKING_DIR }}
+        run: packer init .
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Packer Format Check
-        run: packer fmt -check ${{ env.WORKING_DIR }}
+        run: packer fmt -check .
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Packer Validate
+        run: packer validate .
+        working-directory: ${{ env.WORKING_DIR }}
 
   build-ami:
     name: Build AMI
@@ -48,7 +50,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
@@ -56,24 +58,33 @@ jobs:
           version: latest
 
       - name: Packer Init
-        run: packer init ${{ env.WORKING_DIR }}
+        run: packer init .
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Get latest release
         id: latest_release
         run: |
-            VERSION=$(curl -s -f https://api.github.com/repos/${{ github.repository }}/releases/latest \
-            | jq -r '.tag_name')
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION=$(curl -sS -H "Authorization: Bearer ${{ github.token }}" \
+            https://api.github.com/repos/${{ github.repository }}/releases/latest \
+            | jq -r '.tag_name // empty')
+
+          if [ -z "$VERSION" ]; then
+            echo "No published release found. Create one first."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build AMI
-        env:
-          APP_VERSION: ${{ github.ref_name }}
+        id: build
         run: |
-          packer build -machine-readable -var "release_version=${{ steps.latest_release.outputs.version }}" main.pkr.hcl \
-          | tee packer.txt
-          AMI_ID=$(grep 'artifact,0,id' packer.txt | cut -d, -f6 | cut -d: -f2)
-          echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+          packer build \
+            -var "release_version=${{ steps.latest_release.outputs.version }}" \
+            .
+
+          AMI_ID=$(jq -r '.builds[-1].artifact_id' manifest.json | cut -d: -f2)
+          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
           echo "Built AMI: $AMI_ID"
+        working-directory: ${{ env.WORKING_DIR }}
 
   verify-ami:
     name: Verify AMI
@@ -85,47 +96,22 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ github.event.inputs.aws_region }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Check AMI exists and is available
+      - name: Check AMI is available
         run: |
-          AMI_ID=${{ needs.build-ami.outputs.ami_id }}
-          echo "Checking AMI: $AMI_ID"
+          AMI_ID="${{ needs.build-ami.outputs.ami_id }}"
 
-          STATE=$(aws ec2 describe-images \
-            --image-ids $AMI_ID \
-            --query 'Images[0].State' \
-            --output text)
-
-          echo "AMI State: $STATE"
-
-          if [ "$STATE" != "available" ]; then
-            echo "AMI is not in available state!"
+          if [ -z "$AMI_ID" ]; then
+            echo "No AMI id was produced by the build job."
             exit 1
           fi
-      - name: Check AMI tags
-        run: |
-          AMI_ID=${{ needs.build-ami.outputs.ami_id }}
 
-          aws ec2 describe-images \
-            --image-ids $AMI_ID \
-            --query 'Images[0].Tags' \
+          aws ec2 wait image-available --image-ids "$AMI_ID"
+
+          aws ec2 describe-images --image-ids "$AMI_ID" \
+            --query 'Images[0].{ID:ImageId,Name:Name,State:State,Arch:Architecture,Created:CreationDate}' \
             --output table
 
-      - name: Check AMI block device mappings
-        run: |
-          AMI_ID=${{ needs.build-ami.outputs.ami_id }}
-
-          aws ec2 describe-images \
-            --image-ids $AMI_ID \
-            --query 'Images[0].BlockDeviceMappings' \
-            --output table
-
-      - name: Print AMI summary
-        run: |
-          AMI_ID=${{ needs.build-ami.outputs.ami_id }}
-
-          aws ec2 describe-images \
-            --image-ids $AMI_ID \
-            --query 'Images[0].{ID:ImageId, Name:Name, State:State, CreationDate:CreationDate}' \
-            --output table
+          aws ec2 describe-images --image-ids "$AMI_ID" \
+            --query 'Images[0].BlockDeviceMappings' --output table

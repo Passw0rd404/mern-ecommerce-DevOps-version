@@ -1,48 +1,63 @@
+import "dotenv/config";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import crypto from "crypto";
-import dotenv from "dotenv";
 
-dotenv.config();
+const REGION = process.env.AWS_REGION;
+const BUCKET = process.env.S3_BUCKET_NAME;
+// Public base URL of the site, for example https://dev.abdullahsameh.tech
+const CDN_URL = (process.env.CLOUDFRONT_URL || "").replace(/\/+$/, "");
 
-const s3Client = new S3Client({ 
-  region: process.env.AWS_REGION || 'eu-north-1'
-});
+// fail at startup instead of at the first upload
+if (!REGION || !BUCKET || !CDN_URL) {
+	throw new Error("AWS_REGION, S3_BUCKET_NAME and CLOUDFRONT_URL must be set");
+}
+
+// no credentials here on purpose:
+// on EC2 the SDK uses the instance IAM role automatically
+const s3Client = new S3Client({ region: REGION });
 
 export const uploadToS3 = async (base64Image) => {
-  const buffer = Buffer.from(base64Image.replace(/^data:image\/\w+;base64,/, ""), 'base64');
-  
-  const optimized = await sharp(buffer)
-    .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 80 })
-    .toBuffer();
+	const buffer = Buffer.from(base64Image.replace(/^data:image\/\w+;base64,/, ""), "base64");
 
-  const fileName = `products/${crypto.randomUUID()}.jpg`;
-  
-  await s3Client.send(new PutObjectCommand({
-    Bucket: process.env.S3_BUCKET_NAME,
-    Key: fileName,
-    Body: optimized,
-    ContentType: 'image/jpeg',
-  }));
+	const optimized = await sharp(buffer)
+		.resize(1000, 1000, { fit: "inside", withoutEnlargement: true })
+		.jpeg({ quality: 80 })
+		.toBuffer();
 
-  return process.env.CLOUDFRONT_URL 
-    ? `${process.env.CLOUDFRONT_URL}/${fileName}`
-    : `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+	const fileName = `products/${crypto.randomUUID()}.jpg`;
+
+	await s3Client.send(
+		new PutObjectCommand({
+			Bucket: BUCKET,
+			Key: fileName,
+			Body: optimized,
+			ContentType: "image/jpeg",
+			// names are random UUIDs and never overwritten, so cache for a year
+			CacheControl: "public, max-age=31536000, immutable",
+		})
+	);
+
+	// the bucket is private, so images are only reachable through CloudFront
+	return `${CDN_URL}/${fileName}`;
 };
 
 export const deleteFromS3 = async (imageUrl) => {
-  try {
-    const url = new URL(imageUrl);
-    const key = url.pathname.substring(1);
-    
-    await s3Client.send(new DeleteObjectCommand({
-      Bucket: process.env.S3_BUCKET_NAME,
-      Key: key,
-    }));
-  } catch (error) {
-    console.error("S3 Delete Error:", error);
-  }
+	try {
+		const key = decodeURIComponent(new URL(imageUrl).pathname.substring(1));
+
+		// only ever delete product images
+		if (!key.startsWith("products/")) return;
+
+		await s3Client.send(
+			new DeleteObjectCommand({
+				Bucket: BUCKET,
+				Key: key,
+			})
+		);
+	} catch (error) {
+		console.error("S3 Delete Error:", error);
+	}
 };
 
 export default { uploadToS3, deleteFromS3 };

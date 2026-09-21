@@ -1,16 +1,42 @@
-name: Frontend Rollback
+name: Frontend - Rollback
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'The version/tag to rollback to (e.g., v1.0.1)'
+        description: 'Release tag to roll back to (e.g. v1.0.1)'
         required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-release
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ inputs.version }}
+  FRONTEND_BUCKET: ${{ secrets.LIVE_FRONTEND_BUCKET_NAME }}
+  ARTIFACTS_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+  KVS_ARN: ${{ secrets.CLOUDFRONT_KVS_ARN }}
+  SITE_URL: ${{ secrets.SITE_URL }}
 
 jobs:
   rollback:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate version
+        run: |
+          if ! [[ "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -18,46 +44,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # CHECK IF FILES EXIST IN LIVE BUCKET
-      - name: Check for existing files
-        id: check_files
+      - name: Restore version if it is missing from the live bucket
         run: |
-          if aws s3 ls "s3://${{ secrets.LIVE_FRONTEND_BUCKET_NAME }}/${{ github.event.inputs.version }}/" > /dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
+          if aws s3api head-object --bucket "$FRONTEND_BUCKET" \
+               --key "$VERSION/index.html" > /dev/null 2>&1; then
+            echo "Version $VERSION is still in the frontend bucket."
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Restoring $VERSION from the artifacts bucket..."
+            aws s3 cp "s3://$ARTIFACTS_BUCKET/frontend/frontend-$VERSION.tar.gz" restore.tar.gz
+            mkdir restore_dir
+            tar -xzf restore.tar.gz -C restore_dir
+            bash .github/scripts/upload-frontend.sh restore_dir "$FRONTEND_BUCKET" "$VERSION"
           fi
 
-      # RESTORE FROM ARTIFACT BUCKET (If missing from Live)
-      - name: Restore from Artifacts
-        if: steps.check_files.outputs.exists == 'false'
-        run: |
-          echo "Version not found in Live bucket. Restoring from Artifacts..."
-          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/frontend/frontend-${{ github.event.inputs.version }}.tar.gz .
-          mkdir restore_dir
-          tar -xzf frontend-${{ github.event.inputs.version }}.tar.gz -C restore_dir
-          aws s3 sync restore_dir s3://${{ secrets.LIVE_FRONTEND_BUCKET_NAME }}/${{ github.event.inputs.version }} --delete
-
-      # UPDATE CLOUDFRONT ORIGIN PATH
-      - name: Point CloudFront to Rollback Version
-        run: |
-          aws cloudfront get-distribution-config --id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} > config.json
-          ETAG=$(jq -r '.ETag' config.json)
-     
-          # Update OriginPath to the target version folder
-          jq '.DistributionConfig.Origins.Items[0].OriginPath = "/${{ github.event.inputs.version }}"' config.json > updated_config.json
-
-          aws cloudfront update-distribution \
-            --id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --if-match $ETAG \
-            --distribution-config file://updated_config.json
-
-      # INVALIDATE CACHE
-      - name: Invalidate CloudFront Cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
-
-      - name: Success Message
-        run: echo "Successfully rolled back to version ${{ github.event.inputs.version }}"
+      - name: Switch live version
+        run: bash .github/scripts/switch-frontend.sh "$VERSION"

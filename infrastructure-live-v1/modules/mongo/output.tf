@@ -1,5 +1,6 @@
-output "mongodb_endpoint_id" {
-  value = aws_vpc_endpoint.mongodb_atlas.id
+output "privatelink_service_name" {
+  description = "Atlas PrivateLink service name; the vpc module creates the interface endpoint from it"
+  value       = mongodbatlas_privatelink_endpoint.this.endpoint_service_name
 }
 
 output "project_id" {
@@ -7,23 +8,18 @@ output "project_id" {
   value       = mongodbatlas_project.this.id
 }
 
-output "cluster_id" {
-  description = "MongoDB Atlas cluster ID"
-  value       = mongodbatlas_cluster.this.cluster_id
+output "cluster_name" {
+  description = "MongoDB Atlas cluster name"
+  value       = mongodbatlas_advanced_cluster.this.name
 }
 
 output "connection_uri" {
-  description = "Standard MongoDB connection URI (with credentials embedded)"
-  value       = "mongodb+srv://${var.db_username}:${var.db_password}@${mongodbatlas_cluster.this.connection_strings[0].standard_srv}"
+  description = "Private-endpoint SRV URI with credentials and database name"
+  value       = "mongodb+srv://${var.db_username}:${random_password.db.result}@${replace(local.private_srv[0], "mongodb+srv://", "")}/${var.database_name}?retryWrites=true&w=majority"
   sensitive   = true
-}
-
-output "connection_uri_srv" {
-  description = "SRV connection string without credentials (safer to log)"
-  value       = mongodbatlas_cluster.this.connection_strings[0].standard_srv
 }
 
 output "state" {
   description = "Current state of the cluster"
-  value       = mongodbatlas_cluster.this.state_name
+  value       = mongodbatlas_advanced_cluster.this.state_name
 }

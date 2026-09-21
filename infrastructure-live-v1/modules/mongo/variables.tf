@@ -1,19 +1,6 @@
 variable "region" {
-    description = "AWS region"
-    type = string
-    default = "eu-north-1"
-}
-
-variable "atlas_public_key" {
-  description = "MongoDB Atlas API public key"
+  description = "AWS region of the VPC, also where the cluster runs (for example eu-north-1)"
   type        = string
-  sensitive   = true
-}
-
-variable "atlas_private_key" {
-  description = "MongoDB Atlas API private key"
-  type        = string
-  sensitive   = true
 }
 
 variable "atlas_org_id" {
@@ -24,39 +11,52 @@ variable "atlas_org_id" {
 variable "project_name" {
   description = "Name of the Atlas project"
   type        = string
-  default     = "my-project"
+  default     = "mern"
 }
 
 variable "cluster_name" {
   description = "Name of the Atlas cluster"
   type        = string
-  default     = "my-free-cluster"
+  default     = "app"
 }
 
-variable "cloud_provider" {
-  description = "Backing cloud provider for M0 (AWS, GCP, or AZURE)"
+variable "mongo_db_major_version" {
+  description = "MongoDB major version"
   type        = string
-  default     = "AWS"
+  default     = "7.0"
+}
+
+variable "instance_size" {
+  description = "Cluster tier and autoscaling floor. PrivateLink needs M10 or larger."
+  type        = string
+  default     = "M10"
+}
+
+variable "max_instance_size" {
+  description = "Highest tier compute autoscaling may scale up to"
+  type        = string
+  default     = "M30"
+}
+
+variable "database_name" {
+  description = "Database the app uses; the user gets readWrite on it only"
+  type        = string
+  default     = "ecommerce"
 }
 
 variable "db_username" {
   description = "Database username"
   type        = string
+  default     = "app"
 }
 
-variable "db_password" {
-  description = "Database password"
-  type        = string
-  sensitive   = true
-}
-
-variable "allowed_cidr" {
-  description = "CIDR block allowed to connect (use 0.0.0.0/0 to allow all, restrict in prod)"
-  type        = string
-  default     = "0.0.0.0/0"
+variable "termination_protection" {
+  description = "Block deleting the cluster. Set true in prod; keep false where CI destroys the environment."
+  type        = bool
+  default     = false
 }
 
 variable "vpc_endpoint_id" {
-  description = "The VPC endpoint ID from your vpc_endpoints module (aws_vpc_endpoint.mongodb_atlas.id)"
+  description = "ID of the interface endpoint created by the vpc module for Atlas"
   type        = string
 }

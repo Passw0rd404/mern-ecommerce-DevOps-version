@@ -14,23 +14,24 @@ export const getAllProducts = async (req, res) => {
 
 export const getFeaturedProducts = async (req, res) => {
 	try {
-		let featuredProducts = await redis.get("featured_products");
-		if (featuredProducts) {
-			return res.json(JSON.parse(featuredProducts));
+		// Redis is only a cache here: if it fails, skip it and use MongoDB
+		try {
+			const cached = await redis.get("featured_products");
+			if (cached) {
+				return res.json(JSON.parse(cached));
+			}
+		} catch (err) {
+			console.log("Redis read failed, using MongoDB:", err.message);
 		}
 
-		// if not in redis, fetch from mongodb
-		// .lean() is gonna return a plain javascript object instead of a mongodb document
-		// which is good for performance
-		featuredProducts = await Product.find({ isFeatured: true }).lean();
+		// .lean() returns plain JS objects, which is faster
+		const featuredProducts = await Product.find({ isFeatured: true }).lean();
 
-		if (!featuredProducts) {
-			return res.status(404).json({ message: "No featured products found" });
+		try {
+			await redis.set("featured_products", JSON.stringify(featuredProducts));
+		} catch (err) {
+			console.log("Redis write failed:", err.message);
 		}
-
-		// store in redis for future quick access
-
-		await redis.set("featured_products", JSON.stringify(featuredProducts));
 
 		res.json(featuredProducts);
 	} catch (error) {

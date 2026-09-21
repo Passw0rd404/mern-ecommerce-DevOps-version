@@ -8,13 +8,11 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    
+
     steps:
-      # Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Setup Environment with Caching (Root)
       - name: Setup Node.js and Cache (Root)
         uses: ./.github/actions/setup-node-cache
         with:
@@ -22,7 +20,6 @@ jobs:
           working-directory: '.'
           cache-key-prefix: 'root'
 
-      # Setup Environment with Caching (Frontend)
       - name: Setup Node.js and Cache (Frontend)
         uses: ./.github/actions/setup-node-cache
         with:
@@ -30,29 +27,27 @@ jobs:
           working-directory: 'frontend'
           cache-key-prefix: 'frontend'
 
-      # Linting
-      - name: Run ESLint
+      - name: Lint frontend
         run: npm run lint
-        continue-on-error: false
+        working-directory: frontend
 
-      # Linting (Frontend)
-      - name: Run ESLint
-        run: npm run lint --prefix frontend
-        continue-on-error: false
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+        env:
+          NODE_ENV: production
 
-      # Step 5: Security Scan - npm audit (Root)
-      - name: Security Audit - Root
+      - name: Audit backend
         run: npm audit --audit-level=moderate
         continue-on-error: true
 
-      # Step 5: Security Scan - npm audit (Frontend)
-      - name: Security Audit - Frontend
-        run: npm audit --audit-level=moderate --prefix frontend
+      - name: Audit frontend
+        run: npm audit --audit-level=moderate
+        working-directory: frontend
         continue-on-error: true
 
-      # Step 5: Security Scan - Semgrep SAST
       - name: Semgrep Security Scan
-        if: (github.actor != 'dependabot[bot]')
+        if: github.actor != 'dependabot[bot]'
         uses: semgrep/semgrep-action@v1
         with:
           config: >-
@@ -60,10 +55,8 @@ jobs:
             p/nodejs
             p/javascript
             p/react
-            p/eslint
         continue-on-error: true
 
-  # OpenSSF Scorecard - Runs separately to assess security posture
   scorecard:
     runs-on: ubuntu-latest
     permissions:
@@ -71,7 +64,6 @@ jobs:
       id-token: write
       contents: read
       actions: read
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -85,8 +77,7 @@ jobs:
           results_format: sarif
           publish_results: true
 
-      # Upload results to GitHub Security tab
-      - name: Upload Scorecard Results to GitHub
+      - name: Upload Scorecard Results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif

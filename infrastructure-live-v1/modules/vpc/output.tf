@@ -1,25 +1,41 @@
-# Outputs
 output "vpc_id" {
-  description = "VPC ID"
-  value       = aws_vpc.main.id
+  value = aws_vpc.main.id
 }
 
-output "pub_ids" {
-  description = "Public Subnet IDs"
-  value       = [for s in aws_subnet.pub : s.id]
+output "vpc_cidr" {
+  value = aws_vpc.main.cidr_block
 }
 
-output "prv_ids" {
-  description = "Private Subnet IDs"
-  value       = [for s in aws_subnet.prv : s.id]
+output "azs" {
+  value = local.azs
 }
 
-output "security_group_id" {
-  description = "ID of the application security group"
-  value       = aws_security_group.app_sg.id
+# The lists follow the AZ order, so they stay stable as you add AZs
+output "public_subnet_ids" {
+  value = [for az in local.azs : aws_subnet.pub[az].id]
 }
 
-output "nat_gateway_ids" {
-  description = "Internet Gateway ID"
-  value       = [for nat in aws_nat_gateway.nat : nat.id]
+output "private_subnet_ids" {
+  value = [for az in local.azs : aws_subnet.prv[az].id]
+}
+
+output "private_route_table_ids" {
+  value = [for az in local.azs : aws_route_table.prv[az].id]
+}
+
+output "nat_public_ips" {
+  description = "Add these to the MongoDB Atlas IP access list (if you do not use PrivateLink)"
+  value       = [for az in local.nat_azs : aws_eip.nat[az].public_ip]
+}
+
+output "s3_endpoint_id" {
+  value = aws_vpc_endpoint.s3.id
+}
+
+output "interface_endpoint_ids" {
+  value = { for k, v in aws_vpc_endpoint.interface : k => v.id }
+}
+
+output "interface_endpoint_dns" {
+  value = { for k, v in aws_vpc_endpoint.interface : k => v.dns_entry }
 }

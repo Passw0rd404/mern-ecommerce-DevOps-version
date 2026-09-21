@@ -1,51 +1,45 @@
-# Variables
-variable "vpc" {
-  description = "CIDR block for the VPC"
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC (a /16 is assumed by the automatic subnet calculation)"
   type        = string
   default     = "10.0.0.0/16"
 }
 
-variable "pub_cidrs" {
-  type    = list(string)
-  default = ["10.0.1.0/24"]
-}
-
-variable "prv_cidrs" {
-  type    = list(string)
-  default = ["10.0.2.0/24"]
-}
-
-variable "region" {
-    description = "AWS region"
-    type = string
-    default = "eu-north-1"
-}
-
 variable "az_num" {
-  description = "the number of azs in the region I want to provision"
-  type    = number
-  default = 1
-}
+  description = "Number of AZs to use. Each AZ gets one public and one private subnet. An internet-facing ALB needs at least 2."
+  type        = number
+  default     = 2
 
-#Locals
-# Data source to get available availability zones
-data "aws_availability_zones" "available" {
-  state = "available"
-  filter {
-    name   = "opt-in-status"
-    values = ["opt-in-not-required"]
+  validation {
+    condition     = var.az_num >= 1 && var.az_num <= 6
+    error_message = "az_num must be between 1 and 6."
   }
 }
 
-locals {
-  azs = slice(data.aws_availability_zones.available.names, 0, var.az_num)
+variable "pub_cidrs" {
+  description = "Optional. One public subnet CIDR per AZ. Leave empty to calculate them automatically."
+  type        = list(string)
+  default     = []
 }
 
-# to get my ip to give it access to port 22
-data "http" "my_ip" {
-    url = "https://ipv4.icanhazip.com"
+variable "prv_cidrs" {
+  description = "Optional. One private subnet CIDR per AZ. Leave empty to calculate them automatically."
+  type        = list(string)
+  default     = []
 }
 
-locals {
-  my_ip = "${chomp(data.http.my_ip.response_body)}/32"
+variable "single_nat_gateway" {
+  description = "true = one NAT gateway for all AZs (cheaper, good for dev). false = one NAT per AZ (survives an AZ failure)."
+  type        = bool
+  default     = false
+}
+
+variable "interface_endpoints" {
+  description = "Extra interface (PrivateLink) endpoints keyed by name, for example MongoDB Atlas or Grafana Cloud."
+  type = map(object({
+    service_name        = string
+    private_dns_enabled = optional(bool, false)
+    from_port           = optional(number, 443)
+    to_port             = optional(number, 443)
+  }))
+  default = {}
 }

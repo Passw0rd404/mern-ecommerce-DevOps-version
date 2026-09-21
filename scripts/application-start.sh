@@ -1,18 +1,15 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 APP_DIR="/home/ec2-user/ecommerce-backend"
-cd $APP_DIR
+cd "$APP_DIR"
 
-# Check if PM2 is running the app already
-if pm2 describe ecommerce-backend > /dev/null 2>&1; then
-    echo "App is running. Performing zero-downtime reload..."
-    pm2 reload ecommerce-backend --update-env
-else
-    echo "App is not running. Starting fresh..."
-    # Points to your compiled entry point (adjust 'backend/dist/index.js' as needed)
-    pm2 start backend/dist/index.js --name "ecommerce-backend"
-fi
+# Put every variable from .env into the shell, so PM2 hands them to the app.
+# tracing.js needs the OTEL_* values before the app starts.
+set -a
+source .env
+set +a
 
-# Save the PM2 list so it persists on server reboot
-pm2 save
+# Remove any old entry, then start fresh from the config file in the repo
+pm2 delete ecommerce-backend > /dev/null 2>&1 || true
+pm2 start ecosystem.config.cjs
