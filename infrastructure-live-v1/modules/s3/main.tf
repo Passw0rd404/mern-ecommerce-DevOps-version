@@ -5,15 +5,15 @@ locals {
 
   buckets = {
     artifacts = {
-      name        = "${local.suffix}-artifacts"
-      versioning  = true
+      name       = "${local.suffix}-artifacts"
+      versioning = true
       # big tarballs, worth moving to cold storage before deleting
       archive     = true
       retain_days = var.artifact_retention_days
     }
     frontend = {
-      name        = "${local.suffix}-frontend"
-      versioning  = true
+      name       = "${local.suffix}-frontend"
+      versioning = true
       # small files: IA bills a 128 KB minimum per object, so no transitions
       archive     = false
       retain_days = 30
@@ -31,6 +31,7 @@ resource "aws_s3_bucket" "buckets" {
   for_each = local.buckets
 
   bucket = each.value.name
+  force_destroy = var.force_destroy
 
   tags = { Name = each.value.name }
 }

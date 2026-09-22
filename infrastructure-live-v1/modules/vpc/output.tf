@@ -39,3 +39,8 @@ output "interface_endpoint_ids" {
 output "interface_endpoint_dns" {
   value = { for k, v in aws_vpc_endpoint.interface : k => v.dns_entry }
 }
+
+output "private_subnet_ids_by_az" {
+  description = "AZ name to private subnet id. The ec2 module creates one ASG per entry."
+  value       = { for az in local.azs : az => aws_subnet.prv[az].id }
+}

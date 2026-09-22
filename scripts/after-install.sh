@@ -5,9 +5,16 @@ APP_DIR="/home/ec2-user/ecommerce-backend"
 cd "$APP_DIR"
 
 # Load SECRET_NAME (the launch template user data writes it to /etc/environment)
-set -a
-source /etc/environment
-set +a
+# user data writes SECRET_NAME at first boot; wait for it if the deploy starts first
+for i in $(seq 1 30); do
+  if [ -r /etc/environment ]; then
+    set -a
+    . /etc/environment
+    set +a
+  fi
+  [ -n "${SECRET_NAME:-}" ] && break
+  sleep 2
+done
 : "${SECRET_NAME:?SECRET_NAME is not set in /etc/environment}"
 
 # Region (IMDSv2: get a token first)
@@ -23,10 +30,6 @@ SECRET_JSON=$(aws secretsmanager get-secret-value \
 
 # One KEY='value' line per secret. Single quotes keep any character safe.
 echo "$SECRET_JSON" | jq -r 'to_entries[] | "\(.key)=\(.value | tostring | @sh)"' > .env
-
-# Static, non-sensitive values
-echo "NODE_ENV=production" >> .env
-echo "PORT=5000" >> .env
 
 chown -R ec2-user:ec2-user "$APP_DIR"
 chmod 600 .env

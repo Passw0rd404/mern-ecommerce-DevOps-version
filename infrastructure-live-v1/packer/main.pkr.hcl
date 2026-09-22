@@ -59,4 +59,12 @@ build {
   provisioner "shell" {
     script = "${path.root}/build.sh"
   }
+
+  post-processor "manifest" {
+    output     = "manifest.json"
+    strip_path = true
+    custom_data = {
+      release = var.release_version
+    }
+  }
 }

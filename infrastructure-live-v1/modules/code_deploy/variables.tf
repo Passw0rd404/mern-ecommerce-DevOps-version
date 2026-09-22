@@ -10,7 +10,7 @@ variable "codedeploy_name" {
 
 variable "autoscaling_group_name" {
   description = "Name of the ASG to deploy to (output of the ec2 module)"
-  type        = string
+  type        = list(string)
 }
 
 variable "target_group_name" {

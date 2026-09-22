@@ -1,5 +1,13 @@
 provider "aws" {
   region = "eu-north-1"
+
+  default_tags {
+    tags = {
+      Project     = "mern"
+      Environment = "dev"
+      ManagedBy   = "terraform"
+    }
+  }
 }
 
 terraform {
@@ -19,24 +27,23 @@ variable "atlas_org_id" {
 # API keys come from MONGODB_ATLAS_PUBLIC_API_KEY and MONGODB_ATLAS_PRIVATE_API_KEY
 provider "mongodbatlas" {}
 
-default_tags {
-    tags = {
-      Project     = "mern"
-      Environment = "dev"
-      ManagedBy   = "terraform"
-    }
-  }
-}
 
 module "code_deploy" {
-  source                 = "../modules/code_deploy"
-  autoscaling_group_name = module.ec2.autoscaling_group_name
-  target_group_name      = module.ec2.target_group_name
+  source                  = "../modules/code_deploy"
+  autoscaling_group_names = module.ec2.autoscaling_group_names
+  target_group_name       = module.ec2.target_group_name
 }
 
 module "vpc" {
   source = "../modules/vpc"
-
+  interface_endpoints = {
+    atlas = {
+      service_name        = module.mongo.privatelink_service_name
+      from_port           = 1024
+      to_port             = 65535
+      private_dns_enabled = false
+    }
+  }
   az_num             = 2
   single_nat_gateway = true # cheap for dev. Set false for one NAT per AZ.
 }
@@ -44,12 +51,24 @@ module "vpc" {
 module "s3" {
   source = "../modules/s3"
 
-  env = "dev"
+  env           = "dev"
   force_destroy = true # dev only, see the destroy section below
 }
 
+variable "domain_name" {
+  description = "Public domain of the site (from terraform.tfvars)"
+  type        = string
+}
+
+variable "app_env" {
+  description = "Extra non-secret backend environment variables (from terraform.tfvars)"
+  type        = map(string)
+  default     = {}
+}
+
 locals {
-  domain_name = "dev.abdullahsameh.tech"
+  domain_name = var.domain_name
+  app_port    = 5000
 }
 
 # CloudFront certificates must live in us-east-1
@@ -128,15 +147,6 @@ variable "stripe_secret_key" {
   sensitive   = true
 }
 
-variable "client_url" {
-  description = "Public URL of the site"
-  type        = string
-}
-
-variable "codedeploy_bucket_name" {
-  description = "Bucket where CI stores the CodeDeploy bundles"
-  type        = string
-}
 
 variable "ami_id" {
   description = "Optional AMI id. Leave null to use the newest Packer-built AMI."
@@ -146,34 +156,33 @@ variable "ami_id" {
 
 module "secrets" {
   source = "../modules/secrets"
-
+  app_port            = local.app_port
+  app_env             = var.app_env
   mongo_uri           = module.mongo.connection_uri
   redis_host          = module.elastic_cache.configuration_endpoint_address
   redis_password      = module.elastic_cache.auth_token
   stripe_secret_key   = var.stripe_secret_key
-  client_url          = var.client_url
-  uploads_bucket_name = module.s3.uploads_bucket_name        # rename to your s3 output
-  cloudfront_url      = "https://${module.cloud_front.domain_name}" # rename to your cloud_front output
+  client_url          = "https://${local.domain_name}"
+  uploads_bucket_name = module.s3.app_bucket_name
+  cloudfront_url      = "https://${local.domain_name}" # rename to your cloud_front output
 }
 
 module "ec2" {
   source = "../modules/ec2"
 
+  app_port               = local.app_port
   vpc_id                   = module.vpc.vpc_id
   vpc_cidr                 = module.vpc.vpc_cidr
-  public_subnet_ids        = module.vpc.public_subnet_ids
   private_subnet_ids_by_az = module.vpc.private_subnet_ids_by_az
 
   ami_id                 = var.ami_id
   secret_arn             = module.secrets.secret_arn
   secret_name            = module.secrets.secret_name
-  uploads_bucket_arn     = module.s3.uploads_bucket_arn # rename to your s3 output
-  codedeploy_bucket_name = var.codedeploy_bucket_name
-}
+  uploads_bucket_arn     = module.s3.app_bucket_arn # rename to your s3 output
+  codedeploy_bucket_name = module.s3.artifacts_bucket_name
+  cpu_target             = 40 # fork mode: one saturated core is ~50% of a 2 vCPU box
 
-module "code_deploy" {
-  source = "../modules/code_deploy"
-
-  autoscaling_group_names = module.ec2.autoscaling_group_names
-  target_group_name       = module.ec2.target_group_name
 }
+output "artifacts_bucket_name" { value = module.s3.artifacts_bucket_name }
+output "codedeploy_app_name" { value = module.code_deploy.app_name }
+output "codedeploy_group_name" { value = module.code_deploy.deployment_group_name }

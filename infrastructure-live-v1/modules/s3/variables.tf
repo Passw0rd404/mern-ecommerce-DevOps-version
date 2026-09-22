@@ -16,7 +16,7 @@ variable "artifact_retention_days" {
 }
 
 variable "force_destroy" {
-     description = "Let terraform destroy delete non-empty buckets (dev only)"
-     type        = bool
-     default     = false
-   }
+  description = "Let terraform destroy delete non-empty buckets (dev only)"
+  type        = bool
+  default     = false
+}

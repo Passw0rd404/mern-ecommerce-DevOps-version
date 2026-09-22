@@ -82,3 +82,4 @@ SITE_URL (new)	https://<your-cloudfront-domain> or your own domain
 CLOUDFRONT_DISTRIBUTION_ID, CLOUDFRONT_S3_ORIGIN_ID	delete, nothing uses them now
 TF_API_TOKEN	delete, the S3 backend doesn't use it
 ```
+Run the workflows in this order: ami, infrastructure_apply, build_ship_deploy_backend, build_ship_deploy_frontend, rollback_frontend, then infrastructure_destroy
