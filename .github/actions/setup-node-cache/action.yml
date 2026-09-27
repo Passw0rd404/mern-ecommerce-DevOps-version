@@ -19,7 +19,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
         # We handle the global ~/.npm cache here natively
@@ -27,16 +27,15 @@ runs:
         cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
 
     - name: Cache Node Modules & Build Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       id: node-cache
       with:
         path: |
           ${{ inputs.working-directory }}/node_modules
-          ${{ inputs.working-directory }}/node_modules/.cache
-        # Key includes OS, Prefix, and Lockfile hash
-        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+        # Key includes OS, Node version, Prefix, and Lockfile hash
+        key: ${{ runner.os }}-node${{ inputs.node-version }}-${{ inputs.cache-key-prefix }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
         restore-keys: |
-          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-
+          ${{ runner.os }}-node${{ inputs.node-version }}-${{ inputs.cache-key-prefix }}-
 
     - name: Install Dependencies
       # Only run if node_modules wasn't restored
