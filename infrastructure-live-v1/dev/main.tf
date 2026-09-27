@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "eu-north-1"
+  region = "eu-central-1"
 
   default_tags {
     tags = {
@@ -12,11 +12,26 @@ provider "aws" {
 
 terraform {
   required_providers {
-    mongodbatlas = {
-      source  = "mongodb/mongodbatlas"
-      version = "~> 2.7"
-    }
+    mongodbatlas = { source = "mongodb/mongodbatlas", version = "~> 2.7" }
+    grafana      = { source = "grafana/grafana", version = ">= 3.13.1" }
   }
+}
+
+variable "grafana_cloud_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "grafana_stack_slug" {
+  type = string
+}
+
+variable "grafana_external_id" {
+  type = string
+}
+
+provider "grafana" {
+  cloud_api_key = var.grafana_cloud_api_key
 }
 
 variable "atlas_org_id" {
@@ -42,6 +57,12 @@ module "vpc" {
       from_port           = 1024
       to_port             = 65535
       private_dns_enabled = false
+    }
+    grafana = {
+      service_name        = var.grafana_privatelink_service_name
+      from_port            = 443
+      to_port              = 443
+      private_dns_enabled  = true   # lets you keep using the normal otlp-gateway hostname in Alloy
     }
   }
   az_num             = 2
@@ -73,8 +94,8 @@ locals {
 
 # CloudFront certificates must live in us-east-1
 provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
+  alias  = "eu-central-1"
+  region = "eu-central-1"
 
   default_tags {
     tags = {
@@ -87,7 +108,7 @@ provider "aws" {
 
 module "acm" {
   source    = "../modules/acm"
-  providers = { aws = aws.us_east_1 }
+  providers = { aws = aws.eu-central-1 }
 
   domain_name = local.domain_name
 }
@@ -134,7 +155,7 @@ module "elastic_cache" {
 module "mongo" {
   source = "../modules/mongo"
 
-  region          = "eu-north-1"
+  region = "eu-central-1"
   atlas_org_id    = var.atlas_org_id
   project_name    = "mern-dev"
   cluster_name    = "app"
@@ -155,7 +176,7 @@ variable "ami_id" {
 }
 
 module "secrets" {
-  source = "../modules/secrets"
+  source              = "../modules/secrets"
   app_port            = local.app_port
   app_env             = var.app_env
   mongo_uri           = module.mongo.connection_uri
@@ -170,7 +191,7 @@ module "secrets" {
 module "ec2" {
   source = "../modules/ec2"
 
-  app_port               = local.app_port
+  app_port                 = local.app_port
   vpc_id                   = module.vpc.vpc_id
   vpc_cidr                 = module.vpc.vpc_cidr
   private_subnet_ids_by_az = module.vpc.private_subnet_ids_by_az
@@ -183,6 +204,24 @@ module "ec2" {
   cpu_target             = 40 # fork mode: one saturated core is ~50% of a 2 vCPU box
 
 }
+
+module "cloud_watch" {
+  source               = "../modules/cloud_watch"
+  grafana_external_id  = var.grafana_external_id
+}
+
+variable "grafana_privatelink_service_name" {
+  description = "AWS PrivateLink service name for Grafana Cloud OTLP ingestion, from Connections > OpenTelemetry > PrivateLink"
+  type        = string
+}
+
+module "grafana" {
+  source              = "../modules/grafana"
+  stack_slug          = var.grafana_stack_slug
+  cloudwatch_role_arn = module.cloud_watch.role_arn
+  aws_regions         = ["eu-central-1"]
+}
+
 output "artifacts_bucket_name" { value = module.s3.artifacts_bucket_name }
 output "codedeploy_app_name" { value = module.code_deploy.app_name }
 output "codedeploy_group_name" { value = module.code_deploy.deployment_group_name }

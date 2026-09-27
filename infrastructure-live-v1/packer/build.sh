@@ -44,6 +44,28 @@ sudo systemctl is-active codedeploy-agent
 sudo systemctl enable codedeploy-agent
 sudo systemctl stop codedeploy-agent
 
+# 7b. Grafana Alloy (config supplied at boot, binary baked in)
+wget -q -O /tmp/grafana-gpg.key https://rpm.grafana.com/gpg.key
+sudo rpm --import /tmp/grafana-gpg.key
+rm -f /tmp/grafana-gpg.key
+
+cat <<'EOF' | sudo tee /etc/yum.repos.d/grafana.repo
+[grafana]
+name=grafana
+baseurl=https://rpm.grafana.com
+repo_gpgcheck=1
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.grafana.com/gpg.key
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+EOF
+
+sudo dnf install -y alloy
+sudo mv /tmp/config.alloy.tmpl /etc/alloy/config.alloy.tmpl
+sudo systemctl enable alloy
+sudo systemctl stop alloy   # started by the install; stop so it doesn't run unconfigured
+
 # 8. Clean up
 sudo dnf clean all
 

@@ -8,7 +8,7 @@ variable "codedeploy_name" {
   default = "backend-app"
 }
 
-variable "autoscaling_group_name" {
+variable "autoscaling_group_names" {
   description = "Name of the ASG to deploy to (output of the ec2 module)"
   type        = list(string)
 }

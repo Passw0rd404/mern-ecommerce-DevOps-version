@@ -30,7 +30,7 @@ locals {
 resource "aws_s3_bucket" "buckets" {
   for_each = local.buckets
 
-  bucket = each.value.name
+  bucket        = each.value.name
   force_destroy = var.force_destroy
 
   tags = { Name = each.value.name }

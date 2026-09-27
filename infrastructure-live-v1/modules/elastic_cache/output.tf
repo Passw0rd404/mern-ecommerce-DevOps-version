@@ -17,3 +17,12 @@ output "redis_auth_token" {
 output "redis_security_group_id" {
   value = aws_security_group.valkey.id
 }
+
+output "configuration_endpoint_address" {
+  value = aws_elasticache_replication_group.main.configuration_endpoint_address
+}
+
+output "auth_token" {
+  value     = random_password.auth.result
+  sensitive = true
+}

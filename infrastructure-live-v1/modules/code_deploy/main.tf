@@ -32,7 +32,7 @@ resource "aws_codedeploy_deployment_group" "backend" {
   service_role_arn      = aws_iam_role.codedeploy.arn
 
   # the ASG and target group come from the ec2 module through variables
-  autoscaling_groups = [var.autoscaling_group_name]
+  autoscaling_groups = var.autoscaling_group_names
 
   deployment_style {
     deployment_option = "WITH_TRAFFIC_CONTROL"

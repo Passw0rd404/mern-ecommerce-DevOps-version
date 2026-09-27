@@ -44,6 +44,9 @@ resource "aws_secretsmanager_secret_version" "backend" {
       AWS_REGION           = data.aws_region.current.region
       S3_BUCKET_NAME       = var.uploads_bucket_name
       CLOUDFRONT_URL       = var.cloudfront_url
+      grafana_otlp_endpoint    = var.grafana_otlp_endpoint
+      grafana_otlp_instance_id = var.grafana_otlp_instance_id
+      grafana_otlp_token       = var.grafana_otlp_token
     }
   ))
 }

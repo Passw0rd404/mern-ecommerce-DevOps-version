@@ -15,7 +15,7 @@ concurrency:
 env:
   TF_VERSION: '1.11.0'
   WORKING_DIR: './infrastructure-live-v1/dev'
-  AWS_REGION: 'eu-north-1'
+  AWS_REGION: 'eu-central-1'
 
 jobs:
   terraform:

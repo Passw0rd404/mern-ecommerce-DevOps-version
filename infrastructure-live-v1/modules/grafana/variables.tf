@@ -1,5 +1,14 @@
-variable "region" {
-  description = "AWS region"
+variable "stack_slug" {
+  description = "Your Grafana Cloud stack name"
   type        = string
-  default     = "eu-north-1"
+}
+
+variable "cloudwatch_role_arn" {
+  description = "role_arn output from the cloud_watch module"
+  type        = string
+}
+
+variable "aws_regions" {
+  type    = list(string)
+  default = ["eu-north-1"]
 }

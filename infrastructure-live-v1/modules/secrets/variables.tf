@@ -59,3 +59,17 @@ variable "app_env" {
   type        = map(string)
   default     = {}
 }
+
+variable "grafana_otlp_endpoint" {
+  description = "OTLP gateway URL, from Grafana Cloud > Connections > OpenTelemetry"
+  type        = string
+}
+
+variable "grafana_otlp_instance_id" {
+  type = string
+}
+
+variable "grafana_otlp_token" {
+  type      = string
+  sensitive = true
+}

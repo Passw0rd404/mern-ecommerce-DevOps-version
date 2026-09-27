@@ -1,0 +1,42 @@
+otelcol.receiver.otlp "app" {
+  grpc { endpoint = "127.0.0.1:4317" }
+  http { endpoint = "127.0.0.1:4318" }
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+prometheus.exporter.unix "host" {}
+
+prometheus.scrape "host" {
+  targets    = prometheus.exporter.unix.host.targets
+  forward_to = [otelcol.receiver.prometheus.bridge.receiver]
+}
+
+otelcol.receiver.prometheus "bridge" {
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.grafana_cloud.input]
+    logs    = [otelcol.exporter.otlphttp.grafana_cloud.input]
+    traces  = [otelcol.exporter.otlphttp.grafana_cloud.input]
+  }
+}
+
+otelcol.exporter.otlphttp "grafana_cloud" {
+  client {
+    endpoint = "__GRAFANA_OTLP_ENDPOINT__"
+    auth     = otelcol.auth.basic.grafana_cloud.handler
+  }
+}
+
+otelcol.auth.basic "grafana_cloud" {
+  username = "__GRAFANA_OTLP_INSTANCE_ID__"
+  password = "__GRAFANA_OTLP_TOKEN__"
+}

@@ -60,6 +60,11 @@ build {
     script = "${path.root}/build.sh"
   }
 
+  provisioner "file" {
+    source      = "${path.root}/alloy-config.alloy.tmpl"
+    destination = "/tmp/config.alloy.tmpl"
+  }
+
   post-processor "manifest" {
     output     = "manifest.json"
     strip_path = true
