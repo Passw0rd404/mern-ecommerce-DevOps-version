@@ -56,7 +56,17 @@ variable "termination_protection" {
   default     = false
 }
 
-variable "vpc_endpoint_id" {
-  description = "ID of the interface endpoint created by the vpc module for Atlas"
+variable "vpc_id" {
+  description = "VPC ID to create the Atlas PrivateLink endpoint in"
   type        = string
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR block, for the endpoint's security group ingress rule"
+  type        = string
+}
+
+variable "private_subnet_ids" {
+  description = "Private subnet IDs to place the Atlas interface endpoint in"
+  type        = list(string)
 }

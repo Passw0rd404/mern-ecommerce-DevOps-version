@@ -4,17 +4,6 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "az_num" {
-  description = "Number of AZs to use. Each AZ gets one public and one private subnet. An internet-facing ALB needs at least 2."
-  type        = number
-  default     = 2
-
-  validation {
-    condition     = var.az_num >= 1 && var.az_num <= 6
-    error_message = "az_num must be between 1 and 6."
-  }
-}
-
 variable "pub_cidrs" {
   description = "Optional. One public subnet CIDR per AZ. Leave empty to calculate them automatically."
   type        = list(string)
@@ -25,12 +14,6 @@ variable "prv_cidrs" {
   description = "Optional. One private subnet CIDR per AZ. Leave empty to calculate them automatically."
   type        = list(string)
   default     = []
-}
-
-variable "single_nat_gateway" {
-  description = "true = one NAT gateway for all AZs (cheaper, good for dev). false = one NAT per AZ (survives an AZ failure)."
-  type        = bool
-  default     = false
 }
 
 variable "interface_endpoints" {

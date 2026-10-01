@@ -25,7 +25,7 @@ output "private_route_table_ids" {
 
 output "nat_public_ips" {
   description = "Add these to the MongoDB Atlas IP access list (if you do not use PrivateLink)"
-  value       = [for az in local.nat_azs : aws_eip.nat[az].public_ip]
+  value       = [for az in local.azs : aws_eip.nat[az].public_ip]
 }
 
 output "s3_endpoint_id" {

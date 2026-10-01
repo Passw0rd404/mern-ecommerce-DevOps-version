@@ -1,27 +1,29 @@
-data "aws_availability_zones" "available" {
+# Pinned by AZ ID (euc1-az2, euc1-az3), not by name — AZ *names* like
+# "eu-central-1a" map to a different physical AZ per AWS account, but the
+# *ID* always means the same physical location everywhere. This guarantees
+# these are the two specific zones Grafana's PrivateLink service exposes,
+# regardless of which AWS account this runs in.
+data "aws_availability_zones" "pinned" {
   state = "available"
+
   filter {
-    name   = "opt-in-status"
-    values = ["opt-in-not-required"]
+    name   = "zone-id"
+    values = ["euc1-az2", "euc1-az3"]
   }
 }
 
 data "aws_region" "current" {}
 
 locals {
-  azs = slice(data.aws_availability_zones.available.names, 0, var.az_num)
+  azs = data.aws_availability_zones.pinned.names
 
-  # AZ name -> position, for example { "eu-north-1a" = 0, "eu-north-1b" = 1 }
-  # Adding an AZ appends a new key, so existing resources are not touched.
+  # AZ name -> position, for example { "eu-central-1a" = 0, "eu-central-1b" = 1 }
   az_index = { for i, az in local.azs : az => i }
 
-  # Automatic subnets (with a /16 VPC): public 10.0.0.0/24, 10.0.1.0/24 ...
-  # private 10.0.10.0/24, 10.0.11.0/24 ...
-  pub_cidrs = length(var.pub_cidrs) > 0 ? var.pub_cidrs : [for i in range(var.az_num) : cidrsubnet(var.vpc_cidr, 8, i)]
-  prv_cidrs = length(var.prv_cidrs) > 0 ? var.prv_cidrs : [for i in range(var.az_num) : cidrsubnet(var.vpc_cidr, 8, i + 10)]
-
-  # Which AZs get a NAT gateway
-  nat_azs = var.single_nat_gateway ? [local.azs[0]] : local.azs
+  # Automatic subnets (with a /16 VPC): public 10.0.0.0/24, 10.0.1.0/24
+  # private 10.0.10.0/24, 10.0.11.0/24
+  pub_cidrs = length(var.pub_cidrs) > 0 ? var.pub_cidrs : [for i in range(length(local.azs)) : cidrsubnet(var.vpc_cidr, 8, i)]
+  prv_cidrs = length(var.prv_cidrs) > 0 ? var.prv_cidrs : [for i in range(length(local.azs)) : cidrsubnet(var.vpc_cidr, 8, i + 10)]
 }
 
 # VPC
@@ -69,7 +71,7 @@ resource "aws_subnet" "prv" {
 
 # NAT gateways (one per AZ, or a single one when single_nat_gateway = true)
 resource "aws_eip" "nat" {
-  for_each = toset(local.nat_azs)
+  for_each = toset(local.azs)
 
   domain = "vpc"
 
@@ -77,7 +79,7 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "nat" {
-  for_each = toset(local.nat_azs)
+  for_each = toset(local.azs)
 
   allocation_id = aws_eip.nat[each.key].id
   subnet_id     = aws_subnet.pub[each.key].id
@@ -120,7 +122,7 @@ resource "aws_route" "prv_nat" {
 
   route_table_id         = aws_route_table.prv[each.key].id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat[var.single_nat_gateway ? local.azs[0] : each.key].id
+  nat_gateway_id         = aws_nat_gateway.nat[each.key].id
 }
 
 resource "aws_route_table_association" "prv" {

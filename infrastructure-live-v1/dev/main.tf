@@ -31,7 +31,8 @@ variable "grafana_external_id" {
 }
 
 provider "grafana" {
-  cloud_api_key = var.grafana_cloud_api_key
+  cloud_api_url             = var.grafana_cloud_provider_api_url
+  cloud_access_policy_token = var.grafana_cloud_access_policy_token
 }
 
 variable "atlas_org_id" {
@@ -50,23 +51,8 @@ module "code_deploy" {
 }
 
 module "vpc" {
-  source = "../modules/vpc"
-  interface_endpoints = {
-    atlas = {
-      service_name        = module.mongo.privatelink_service_name
-      from_port           = 1024
-      to_port             = 65535
-      private_dns_enabled = false
-    }
-    grafana = {
-      service_name        = var.grafana_privatelink_service_name
-      from_port            = 443
-      to_port              = 443
-      private_dns_enabled  = true   # lets you keep using the normal otlp-gateway hostname in Alloy
-    }
-  }
-  az_num             = 2
-  single_nat_gateway = true # cheap for dev. Set false for one NAT per AZ.
+  source              = "../modules/vpc"
+  interface_endpoints = {}  # empty for now — atlas moved into the mongo module; add grafana back here later if you pick PrivateLink up again
 }
 
 module "s3" {
@@ -155,11 +141,13 @@ module "elastic_cache" {
 module "mongo" {
   source = "../modules/mongo"
 
-  region = "eu-central-1"
-  atlas_org_id    = var.atlas_org_id
-  project_name    = "mern-dev"
-  cluster_name    = "app"
-  vpc_endpoint_id = module.vpc.interface_endpoint_ids["atlas"]
+  region             = "eu-central-1"
+  atlas_org_id       = var.atlas_org_id
+  project_name       = "mern-dev"
+  cluster_name       = "app"
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = module.vpc.vpc_cidr
+  private_subnet_ids = module.vpc.private_subnet_ids
 }
 
 variable "stripe_secret_key" {
