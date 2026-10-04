@@ -1,6 +1,6 @@
 import { ArrowRight, CheckCircle, HandHeart } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCartStore } from "../stores/useCartStore";
 import axios from "../lib/axios";
 import Confetti from "react-confetti";
@@ -9,29 +9,28 @@ const PurchaseSuccessPage = () => {
 	const [isProcessing, setIsProcessing] = useState(true);
 	const { clearCart } = useCartStore();
 	const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
 	useEffect(() => {
-		const handleCheckoutSuccess = async (sessionId) => {
+    const handleCheckoutSuccess = async (params) => {
 			try {
-				await axios.post("/payments/checkout-success", {
-					sessionId,
-				});
+        await axios.post("/payments/checkout-success", { params });
 				clearCart();
 			} catch (error) {
 				console.log(error);
+        setError("We could not confirm your payment. If you were charged, contact support.");
 			} finally {
 				setIsProcessing(false);
 			}
 		};
 
-		const sessionId = new URLSearchParams(window.location.search).get("session_id");
-		if (sessionId) {
-			handleCheckoutSuccess(sessionId);
+		const params = Object.fromEntries(new URLSearchParams(window.location.search));
+    if (params.paymentStatus === "SUCCESS" && params.signature) {
+			handleCheckoutSuccess(params);
 		} else {
-			setIsProcessing(false);
-			setError("No session ID found in the URL");
+			navigate("/purchase-cancel", { replace: true }); // Kashier redirects here on failure too
 		}
-	}, [clearCart]);
+	}, [clearCart, navigate]);
 
 	if (isProcessing) return "Processing...";
 

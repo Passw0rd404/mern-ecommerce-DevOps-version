@@ -31,22 +31,24 @@ resource "aws_secretsmanager_secret_version" "backend" {
     local.app_env_defaults,
     var.app_env,
     {
-      MONGO_URI            = var.mongo_uri
-      REDIS_MODE           = "cluster"
-      REDIS_HOST           = var.redis_host
-      REDIS_PORT           = "6379"
-      REDIS_TLS            = "true"
-      REDIS_PASSWORD       = var.redis_password
-      ACCESS_TOKEN_SECRET  = random_password.access_token.result
-      REFRESH_TOKEN_SECRET = random_password.refresh_token.result
-      STRIPE_SECRET_KEY    = var.stripe_secret_key
-      CLIENT_URL           = var.client_url
-      AWS_REGION           = data.aws_region.current.region
-      S3_BUCKET_NAME       = var.uploads_bucket_name
-      CLOUDFRONT_URL       = var.cloudfront_url
-      grafana_otlp_endpoint    = var.grafana_otlp_endpoint
-      grafana_otlp_instance_id = var.grafana_otlp_instance_id
-      grafana_otlp_token       = var.grafana_otlp_token
+      MONGO_URI                = var.mongo_uri
+      REDIS_MODE               = "cluster"
+      REDIS_HOST               = var.redis_host
+      REDIS_PORT               = "6379"
+      REDIS_TLS                = "true"
+      REDIS_PASSWORD           = var.redis_password
+      ACCESS_TOKEN_SECRET      = random_password.access_token.result
+      REFRESH_TOKEN_SECRET     = random_password.refresh_token.result
+      CLIENT_URL               = var.client_url
+      AWS_REGION               = data.aws_region.current.region
+      S3_BUCKET_NAME           = var.uploads_bucket_name
+      CLOUDFRONT_URL           = var.cloudfront_url
+      GRAFANA_OTLP_ENDPOINT    = var.grafana_otlp_endpoint
+      GRAFANA_OTLP_INSTANCE_ID = var.grafana_otlp_instance_id
+      GRAFANA_OTLP_TOKEN       = var.grafana_otlp_token
+      KASHIER_SECRET_KEY       = var.kashier_secret_key
+      KASHIER_API_KEY          = var.kashier_api_key
+      KASHIER_MERCHANT_ID      = var.kashier_merchant_id
     }
   ))
 }

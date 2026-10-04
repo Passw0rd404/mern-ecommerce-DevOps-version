@@ -11,14 +11,14 @@ About This Course:
 
 -   🚀 Project Setup
 -   🗄️ MongoDB & Redis Integration
--   💳 Stripe Payment Setup
+-   💳 Kashier Payment Setup
 -   🔐 Robust Authentication System
 -   🔑 JWT with Refresh/Access Tokens
 -   📝 User Signup & Login
 -   🛒 E-Commerce Core
 -   📦 Product & Category Management
 -   🛍️ Shopping Cart Functionality
--   💰 Checkout with Stripe
+-   💰 Checkout with Kashier
 -   🏷️ Coupon Code System
 -   👑 Admin Dashboard
 -   📊 Sales Analytics
@@ -44,7 +44,9 @@ REDIS_MODE=cluster
 ACCESS_TOKEN_SECRET=your_access_token_secret
 REFRESH_TOKEN_SECRET=your_refresh_token_secret
 
-STRIPE_SECRET_KEY=your_stripe_secret_key
+KASHIER_SECRET_KEY=your_kashier_secret_key
+KASHIER_API_KEY=your_kashier_payment_api_key
+KASHIER_MERCHANT_ID=your_kashier_merchant_id
 CLIENT_URL=http://localhost:5173
 NODE_ENV=development
 

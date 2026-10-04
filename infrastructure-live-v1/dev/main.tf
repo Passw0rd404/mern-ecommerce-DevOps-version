@@ -17,9 +17,28 @@ terraform {
   }
 }
 
-variable "grafana_cloud_api_key" {
+variable "kashier_secret_key" {
   type      = string
   sensitive = true
+}
+
+variable "kashier_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "kashier_merchant_id" {
+  type      = string
+  sensitive = true
+}
+
+vvariable "grafana_cloud_access_policy_token" {
+  type      = string
+  sensitive = true
+}
+
+variable "grafana_cloud_provider_api_url" {
+  type = string
 }
 
 variable "grafana_stack_slug" {
@@ -40,7 +59,6 @@ variable "atlas_org_id" {
   type        = string
 }
 
-# API keys come from MONGODB_ATLAS_PUBLIC_API_KEY and MONGODB_ATLAS_PRIVATE_API_KEY
 provider "mongodbatlas" {}
 
 
@@ -51,8 +69,15 @@ module "code_deploy" {
 }
 
 module "vpc" {
-  source              = "../modules/vpc"
-  interface_endpoints = {}  # empty for now — atlas moved into the mongo module; add grafana back here later if you pick PrivateLink up again
+  source = "../modules/vpc"
+  interface_endpoints = {
+    grafana = {
+      service_name        = var.grafana_privatelink_service_name
+      from_port           = 443
+      to_port              = 443
+      private_dns_enabled = false
+    }
+  }
 }
 
 module "s3" {
@@ -78,7 +103,6 @@ locals {
   app_port    = 5000
 }
 
-# CloudFront certificates must live in us-east-1
 provider "aws" {
   alias  = "eu-central-1"
   region = "eu-central-1"
@@ -150,13 +174,6 @@ module "mongo" {
   private_subnet_ids = module.vpc.private_subnet_ids
 }
 
-variable "stripe_secret_key" {
-  description = "Stripe secret key (TF_VAR_stripe_secret_key in CI)"
-  type        = string
-  sensitive   = true
-}
-
-
 variable "ami_id" {
   description = "Optional AMI id. Leave null to use the newest Packer-built AMI."
   type        = string
@@ -164,16 +181,21 @@ variable "ami_id" {
 }
 
 module "secrets" {
-  source              = "../modules/secrets"
-  app_port            = local.app_port
-  app_env             = var.app_env
-  mongo_uri           = module.mongo.connection_uri
-  redis_host          = module.elastic_cache.configuration_endpoint_address
-  redis_password      = module.elastic_cache.auth_token
-  stripe_secret_key   = var.stripe_secret_key
-  client_url          = "https://${local.domain_name}"
-  uploads_bucket_name = module.s3.app_bucket_name
-  cloudfront_url      = "https://${local.domain_name}" # rename to your cloud_front output
+  source                   = "../modules/secrets"
+  app_port                 = local.app_port
+  app_env                  = var.app_env
+  mongo_uri                = module.mongo.connection_uri
+  redis_host               = module.elastic_cache.configuration_endpoint_address
+  redis_password           = module.elastic_cache.auth_token
+  client_url               = "https://${local.domain_name}"
+  uploads_bucket_name      = module.s3.app_bucket_name
+  cloudfront_url           = "https://${local.domain_name}"
+  grafana_otlp_endpoint    = var.grafana_otlp_endpoint
+  grafana_otlp_instance_id = var.grafana_otlp_instance_id
+  grafana_otlp_token       = var.grafana_otlp_token
+  kashier_secret_key       = var.kashier_secret_key
+  kashier_api_key          = var.kashier_api_key
+  kashier_merchant_id      = var.kashier_merchant_id
 }
 
 module "ec2" {
@@ -194,8 +216,8 @@ module "ec2" {
 }
 
 module "cloud_watch" {
-  source               = "../modules/cloud_watch"
-  grafana_external_id  = var.grafana_external_id
+  source              = "../modules/cloud_watch"
+  grafana_external_id = var.grafana_external_id
 }
 
 variable "grafana_privatelink_service_name" {

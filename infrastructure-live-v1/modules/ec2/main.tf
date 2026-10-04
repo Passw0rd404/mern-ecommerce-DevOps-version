@@ -59,7 +59,7 @@ resource "aws_vpc_security_group_ingress_rule" "app_from_nlb" {
 
 resource "aws_vpc_security_group_egress_rule" "app_https" {
   security_group_id = aws_security_group.app.id
-  description       = "HTTPS: Stripe, S3, Secrets Manager, Systems Manager, CodeDeploy, Grafana"
+  description       = "HTTPS: Kashier, S3, Secrets Manager, Systems Manager, CodeDeploy, Grafana"
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443

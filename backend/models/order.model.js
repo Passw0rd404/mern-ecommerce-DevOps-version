@@ -31,10 +31,8 @@ const orderSchema = new mongoose.Schema(
 			required: true,
 			min: 0,
 		},
-		stripeSessionId: {
-			type: String,
-			unique: true,
-		},
+		kashierReference: { type: String, unique: true, sparse: true },
+		kashierTransactionId: { type: String },
 	},
 	{ timestamps: true }
 );

@@ -10,5 +10,5 @@ variable "cloudwatch_role_arn" {
 
 variable "aws_regions" {
   type    = list(string)
-  default = ["eu-north-1"]
+  default = ["eu-central-1"]
 }

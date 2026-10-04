@@ -16,7 +16,6 @@
 		"@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
 		"@opentelemetry/instrumentation-winston": "^0.55.0",
 		"@opentelemetry/sdk-node": "^0.211.0",
-		"@stripe/stripe-js": "^4.3.0",
 		"axios": "^1.7.5",
 		"framer-motion": "^11.3.30",
 		"lucide-react": "^0.435.0",

@@ -78,7 +78,8 @@ jobs:
           MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
           MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
           TF_VAR_atlas_org_id: ${{ secrets.MONGODB_ATLAS_ORG_ID }}
-          TF_VAR_stripe_secret_key: ${{ secrets.STRIPE_SECRET_KEY }}
+          TF_VAR_grafana_cloud_api_key: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
+          TF_VAR_grafana_otlp_token: ${{ secrets.GRAFANA_OTLP_TOKEN }}
 
       - name: Terraform Apply
         run: terraform apply -input=false -lock-timeout=5m tfplan

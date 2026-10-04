@@ -79,6 +79,7 @@ jobs:
         run: |
           packer build \
             -var "release_version=${{ steps.latest_release.outputs.version }}" \
+            -var "region=${{ env.AWS_REGION }}" \
             .
 
           AMI_ID=$(jq -r '.builds[-1].artifact_id' manifest.json | cut -d: -f2)

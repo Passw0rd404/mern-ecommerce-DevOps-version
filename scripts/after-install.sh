@@ -29,7 +29,25 @@ SECRET_JSON=$(aws secretsmanager get-secret-value \
   --query SecretString --output text)
 
 # One KEY='value' line per secret. Single quotes keep any character safe.
-echo "$SECRET_JSON" | jq -r 'to_entries[] | "\(.key)=\(.value | tostring | @sh)"' > .env
+echo "$SECRET_JSON" | python3 -c '
+import sys, json, shlex
+for k, v in json.load(sys.stdin).items():
+    print(f"{k}={shlex.quote(str(v))}")
+' > .env
 
 chown -R ec2-user:ec2-user "$APP_DIR"
 chmod 600 .env
+
+echo "Configuring Grafana Alloy..."
+set -a
+. .env
+set +a
+
+sudo sed \
+  -e "s|__GRAFANA_OTLP_ENDPOINT__|${GRAFANA_OTLP_ENDPOINT}|g" \
+  -e "s|__GRAFANA_OTLP_INSTANCE_ID__|${GRAFANA_OTLP_INSTANCE_ID}|g" \
+  -e "s|__GRAFANA_OTLP_TOKEN__|${GRAFANA_OTLP_TOKEN}|g" \
+  /etc/alloy/config.alloy.tmpl | sudo tee /etc/alloy/config.alloy > /dev/null
+
+sudo chmod 600 /etc/alloy/config.alloy
+sudo systemctl restart alloy

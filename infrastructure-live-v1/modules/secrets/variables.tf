@@ -27,14 +27,8 @@ variable "redis_password" {
   sensitive   = true
 }
 
-variable "stripe_secret_key" {
-  description = "Stripe secret key"
-  type        = string
-  sensitive   = true
-}
-
 variable "client_url" {
-  description = "Public URL of the site (used for Stripe redirects)"
+  description = "Public URL of the site (used for Kashier redirects and webhook)"
   type        = string
 }
 
@@ -70,6 +64,21 @@ variable "grafana_otlp_instance_id" {
 }
 
 variable "grafana_otlp_token" {
+  type      = string
+  sensitive = true
+}
+
+variable "kashier_secret_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "kashier_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "kashier_merchant_id" {
   type      = string
   sensitive = true
 }
