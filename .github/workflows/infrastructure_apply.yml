@@ -78,8 +78,11 @@ jobs:
           MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
           MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
           TF_VAR_atlas_org_id: ${{ secrets.MONGODB_ATLAS_ORG_ID }}
-          TF_VAR_grafana_cloud_api_key: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
+          TF_VAR_grafana_cloud_access_policy_token: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
           TF_VAR_grafana_otlp_token: ${{ secrets.GRAFANA_OTLP_TOKEN }}
+          TF_VAR_kashier_secret_key: ${{ secrets.KASHIER_SECRET_KEY }}
+          TF_VAR_kashier_api_key: ${{ secrets.KASHIER_API_KEY }}
+          TF_VAR_kashier_merchant_id: ${{ secrets.KASHIER_MERCHANT_ID }}
 
       - name: Terraform Apply
         run: terraform apply -input=false -lock-timeout=5m tfplan
