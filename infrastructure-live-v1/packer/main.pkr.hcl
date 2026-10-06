@@ -56,13 +56,13 @@ source "amazon-ebs" "amazon_linux" {
 build {
   sources = ["source.amazon-ebs.amazon_linux"]
 
-  provisioner "shell" {
-    script = "${path.root}/build.sh"
-  }
-
   provisioner "file" {
     source      = "${path.root}/alloy-config.alloy.tmpl"
     destination = "/tmp/config.alloy.tmpl"
+  }
+
+  provisioner "shell" {
+    script = "${path.root}/build.sh"
   }
 
   post-processor "manifest" {

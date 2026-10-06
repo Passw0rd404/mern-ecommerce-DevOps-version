@@ -5,6 +5,8 @@ NODE_MAJOR=24
 
 echo "--- Starting AMI Build ---"
 
+test -f /tmp/config.alloy.tmpl || { echo "Alloy template was not uploaded"; exit 1; }
+
 # 1. Update the OS
 sudo dnf update -y
 
