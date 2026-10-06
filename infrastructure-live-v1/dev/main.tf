@@ -29,7 +29,8 @@ provider "aws" {
 }
 
 provider "grafana" {
-  cloud_api_url             = var.grafana_cloud_provider_api_url
+  cloud_api_url             = "https://grafana.com"
+  cloud_provider_url        = var.grafana_cloud_provider_api_url
   cloud_access_policy_token = var.grafana_cloud_access_policy_token
 }
 
