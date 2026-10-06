@@ -1,8 +1,6 @@
 name: Frontend - Build and Release
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
