@@ -2,6 +2,10 @@ name: Build AMI
 
 on:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release tag to bake into the AMI (e.g. v1.0.0)'
+        required: true
 
 permissions:
   contents: read
@@ -10,12 +14,20 @@ permissions:
 env:
   WORKING_DIR: './infrastructure-live-v1/packer'
   AWS_REGION: 'eu-central-1'
+  VERSION: ${{ inputs.release_version }}
 
 jobs:
   validate-packer:
     name: Validate Packer File
     runs-on: ubuntu-latest
     steps:
+      - name: Validate version input
+        run: |
+          if ! [[ "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -33,7 +45,11 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
 
       - name: Packer Validate
-        run: packer validate .
+        run: |
+          packer validate \
+            -var "release_version=$VERSION" \
+            -var "region=${{ env.AWS_REGION }}" \
+            .
         working-directory: ${{ env.WORKING_DIR }}
 
   build-ami:
@@ -61,25 +77,12 @@ jobs:
         run: packer init .
         working-directory: ${{ env.WORKING_DIR }}
 
-      - name: Get latest release
-        id: latest_release
-        run: |
-          VERSION=$(curl -sS -H "Authorization: Bearer ${{ github.token }}" \
-            https://api.github.com/repos/${{ github.repository }}/releases/latest \
-            | jq -r '.tag_name // empty')
-
-          if [ -z "$VERSION" ]; then
-            echo "No published release found. Create one first."
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Build AMI
         id: build
         run: |
           packer build \
-            -var "release_version=${{ steps.latest_release.outputs.version }}" \
-            -var "region=${{ env.AWS_REGION }}" \
+            -var "release_version=$VERSION" \
+            -var "region=$AWS_REGION" \
             .
 
           AMI_ID=$(jq -r '.builds[-1].artifact_id' manifest.json | cut -d: -f2)
