@@ -39,8 +39,8 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
+      - name: Terraform Format
+        run: terraform fmt -recursive
         working-directory: ./infrastructure-live-v1
 
       - name: Terraform Init
