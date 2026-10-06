@@ -52,7 +52,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
 
       - name: TFLint Setup
-        uses: terraform-linters/setup-tflint@v4
+        uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: latest
 
@@ -72,7 +72,7 @@ jobs:
           soft_fail: true
 
       - name: Terraform Plan
-        run: terraform plan -no-color -input=false -lock-timeout=5m -out=tfplan
+        run: terraform plan -no-color -input=false -lock-timeout=5m -var-file=dev.tfvars -out=tfplan
         working-directory: ${{ env.WORKING_DIR }}
         env:
           MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
