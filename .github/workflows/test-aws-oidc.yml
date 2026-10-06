@@ -7,8 +7,13 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: 'eu-central-1'
+
 jobs:
-  test-aws-oidc:
+
+  test-terraform-role:
+    name: Test gha-terraform
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +21,52 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-terraform
-          aws-region: eu-central-1
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check AWS identity
+        run: aws sts get-caller-identity
+
+
+  test-packer-role:
+    name: Test gha-packer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-packer
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check AWS identity
+        run: aws sts get-caller-identity
+
+
+  test-backend-deploy-role:
+    name: Test gha-backend-deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-backend-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check AWS identity
+        run: aws sts get-caller-identity
+
+
+  test-frontend-release-role:
+    name: Test gha-frontend-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-frontend-release
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Check AWS identity
         run: aws sts get-caller-identity
