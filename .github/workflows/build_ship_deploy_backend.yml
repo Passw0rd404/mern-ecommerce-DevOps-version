@@ -37,7 +37,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-terraform
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-backend-deploy
           aws-region: ${{ secrets.AWS_REGION }}
 
       # Production dependencies are installed inside deploy/, so the cached
