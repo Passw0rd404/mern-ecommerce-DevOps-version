@@ -34,14 +34,14 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
       - name: Terraform Format
         run: terraform fmt -recursive
-        working-directory: ./infrastructure-live-v1
+        working-directory: ${{ env.WORKING_DIR }}
 
       - name: Terraform Init
         run: terraform init -input=false

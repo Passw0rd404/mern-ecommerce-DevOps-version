@@ -4,7 +4,7 @@ locals {
   private_endpoints = coalesce(mongodbatlas_advanced_cluster.this.connection_strings.private_endpoint, [])
   private_srv = [
     for pe in local.private_endpoints : pe.srv_connection_string
-    if contains([for e in pe.endpoints : e.endpoint_id], var.vpc_endpoint_id)
+    if contains([for e in pe.endpoints : e.endpoint_id], aws_vpc_endpoint.atlas.id)
   ]
 }
 

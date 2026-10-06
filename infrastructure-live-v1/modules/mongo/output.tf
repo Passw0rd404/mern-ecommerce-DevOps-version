@@ -1,5 +1,5 @@
 output "privatelink_service_name" {
-  description = "Atlas PrivateLink service name; the vpc module creates the interface endpoint from it"
+  description = "Atlas PrivateLink service name (the interface endpoint is created inside this module)"
   value       = mongodbatlas_privatelink_endpoint.this.endpoint_service_name
 }
 
