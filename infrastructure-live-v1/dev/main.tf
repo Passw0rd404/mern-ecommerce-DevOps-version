@@ -320,7 +320,7 @@ module "cloud_front" {
   # Backend S3
   app_bucket_regional_domain = module.s3.app_bucket_regional_domain
   app_bucket_id              = module.s3.app_bucket_name
-  app_bucket_arn              = module.s3.app_bucket_arn
+  app_bucket_arn             = module.s3.app_bucket_arn
 
   # S3 VPC endpoint
   app_write_vpce_id = module.vpc.s3_endpoint_id

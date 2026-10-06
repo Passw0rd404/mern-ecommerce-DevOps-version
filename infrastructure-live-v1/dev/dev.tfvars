@@ -2,8 +2,8 @@ domain_name = "dev.abdullahsameh.tech"
 
 app_env = {
   OTEL_SERVICE_NAME = "ecommerce-backend"
-  KASHIER_MODE       = "test"
-  KASHIER_CURRENCY   = "EGP"
+  KASHIER_MODE      = "test"
+  KASHIER_CURRENCY  = "EGP"
 }
 
 atlas_org_id = "6aba520806f82452b1d61226"
