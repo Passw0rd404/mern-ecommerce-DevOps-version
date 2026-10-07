@@ -72,7 +72,10 @@ jobs:
           soft_fail: true
 
       - name: Terraform Plan
-        run: terraform plan -no-color -input=false -lock-timeout=5m -var-file=dev.tfvars -out=tfplan
+        run: |
+          set -o pipefail
+          terraform plan -no-color -input=false -lock-timeout=5m -var-file=dev.tfvars -out=tfplan 2>&1 | tee plan.log \
+            || { echo "=== ERRORS ==="; grep -n -B2 -A10 'Error:' plan.log; exit 1; }
         working-directory: ${{ env.WORKING_DIR }}
         env:
           MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
