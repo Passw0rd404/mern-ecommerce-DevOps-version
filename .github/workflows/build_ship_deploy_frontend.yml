@@ -2,6 +2,10 @@ name: Frontend - Build and Release
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        default: dev
 
 permissions:
   contents: read
@@ -48,6 +52,8 @@ jobs:
 
       - name: Load deploy config
         uses: ./.github/actions/load-deploy-config
+        with:
+          environment: ${{ inputs.environment }}
 
       # Backup first: if anything below fails, the release is still recoverable
       - name: Archive build to artifacts bucket

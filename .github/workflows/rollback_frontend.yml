@@ -6,6 +6,9 @@ on:
       version:
         description: 'Release tag to roll back to (e.g. v1.0.1)'
         required: true
+      environment:
+        description: 'Environment to roll back'
+        default: dev
 
 permissions:
   contents: read
@@ -39,8 +42,10 @@ jobs:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-frontend-release
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Load deploy config
-        uses: ./.github/actions/load-deploy-config
+       - name: Load deploy config
+         uses: ./.github/actions/load-deploy-config
+        with:
+          environment: ${{ inputs.environment }}
 
       - name: Restore version if it is missing from the live bucket
         run: |
