@@ -56,7 +56,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -input=false -backend-config="bucket=tfstate-mern-dev-${{ vars.AWS_ACCOUNT_ID }}"
         working-directory: ${{ env.WORKING_DIR }}
 
       # The app bucket denies deletes from outside the VPC, so remove its policy first
