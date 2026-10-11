@@ -88,7 +88,7 @@ resource "grafana_cloud_provider_aws_cloudwatch_scrape_job" "core" {
       name       = "NumberOfObjects"
       statistics = ["Average"]
     }
-    scrape_interval_seconds = 3600
+    scrape_interval_seconds = 300
   }
 }
 

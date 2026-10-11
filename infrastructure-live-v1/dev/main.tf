@@ -373,6 +373,9 @@ module "grafana" {
   stack_slug          = var.grafana_stack_slug
   cloudwatch_role_arn = module.cloud_watch.role_arn
   aws_regions         = ["eu-central-1"]
+
+  depends_on = [module.vpc, module.s3, module.ec2, module.elastic_cache, module.cloud_front]
+
 }
 
 

@@ -17,7 +17,8 @@ data "aws_region" "current" {}
 locals {
   azs = data.aws_availability_zones.pinned.names
 
-  # AZ name -> position, for example { "eu-central-1a" = 0, "eu-central-1b" = 1 }
+  # AZ name -> position. Zones are pinned by zone ID (euc1-az2, euc1-az3), which the Grafana
+  # PrivateLink service supports. Names differ per account, so the letters can vary.
   az_index = { for i, az in local.azs : az => i }
 
   # Automatic subnets (with a /16 VPC): public 10.0.0.0/24, 10.0.1.0/24
