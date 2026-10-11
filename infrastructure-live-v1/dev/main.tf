@@ -402,3 +402,7 @@ output "codedeploy_app_name" {
 output "codedeploy_group_name" {
   value = module.code_deploy.deployment_group_name
 }
+
+output "acm_pending_certificate_arn" {
+  value = module.acm.pending_certificate_arn
+}
