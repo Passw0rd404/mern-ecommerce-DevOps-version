@@ -139,17 +139,17 @@ jobs:
           MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
           MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
 
-       - name: Build checklist
-         if: always()
-         run: |
+      - name: Build checklist
+        if: always()
+        run: |
           LOG="${{ env.WORKING_DIR }}/apply.log"
           [ -f "$LOG" ] || exit 0
-           {
-             echo "## Apply checklist"
-             echo "| Resource | Action | Result |"
-             echo "|---|---|---|"
+          {
+            echo "## Apply checklist"
+            echo "| Resource | Action | Result |"
+            echo "|---|---|---|"
             grep -E ': (Creation|Modifications|Destruction) complete after' "$LOG" \
               | sed -E 's/^([^:]+): (Creation|Modifications|Destruction) complete after.*/| \1 | \2 | ✅ |/'
             awk '/Error: /{m=$0; sub(/^.*Error: /,"",m); gsub(/\|/,"/",m); m=substr(m,1,150)}
                  /^[│ ]*with /{a=$0; sub(/^[│ ]*with /,"",a); sub(/,$/,"",a); printf "| %s | %s | ❌ |\n", a, m}' "$LOG"
-           } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"
