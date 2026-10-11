@@ -18,17 +18,10 @@ resource "mongodbatlas_project" "this" {
   org_id = var.atlas_org_id
 }
 
-resource "mongodbatlas_private_endpoint_regional_mode" "this" {
-  project_id = mongodbatlas_project.this.id
-  enabled    = true
-}
-
 resource "mongodbatlas_privatelink_endpoint" "this" {
   project_id    = mongodbatlas_project.this.id
   provider_name = "AWS"
   region        = var.region
-
-  depends_on = [mongodbatlas_private_endpoint_regional_mode.this]
 }
 
 resource "aws_security_group" "atlas_endpoint" {
