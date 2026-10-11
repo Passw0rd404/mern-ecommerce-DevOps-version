@@ -15,7 +15,7 @@ variable "ec2_sg_id" {
 variable "elasticache_node_type" {
   description = "Node instance type. Burstable t4g is fine for dev; use m7g or r7g for real production load."
   type        = string
-  default     = "cache.t4g.micro"
+  default     = "cache.t4g.small"
 }
 
 variable "engine_version" {

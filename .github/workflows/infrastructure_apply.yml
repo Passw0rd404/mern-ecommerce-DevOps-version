@@ -71,24 +71,8 @@ jobs:
           output_format: cli
           soft_fail: true
 
-      - name: Terraform Plan
-        run: |
-          set -o pipefail
-          terraform plan -no-color -input=false -lock-timeout=5m -var-file=dev.tfvars -out=tfplan 2>&1 | tee plan.log \
-            || { echo "=== ERRORS ==="; grep -n -B2 -A10 'Error:' plan.log; exit 1; }
-        working-directory: ${{ env.WORKING_DIR }}
-        env:
-          MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
-          MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
-          TF_VAR_atlas_org_id: ${{ secrets.MONGODB_ATLAS_ORG_ID }}
-          TF_VAR_grafana_cloud_access_policy_token: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
-          TF_VAR_grafana_otlp_token: ${{ secrets.GRAFANA_OTLP_TOKEN }}
-          TF_VAR_kashier_secret_key: ${{ secrets.KASHIER_SECRET_KEY }}
-          TF_VAR_kashier_api_key: ${{ secrets.KASHIER_API_KEY }}
-          TF_VAR_kashier_merchant_id: ${{ secrets.KASHIER_MERCHANT_ID }}
-
       - name: Request ACM certificate early
-        run: terraform apply -auto-approve -input=false -target=module.acm.aws_acm_certificate.site tfplan || true
+        run: terraform apply -auto-approve -input=false -target=module.acm.aws_acm_certificate.site
         working-directory: ${{ env.WORKING_DIR }}
 
       - name: Show DNS record to add
@@ -110,6 +94,22 @@ jobs:
             echo "| Proxy status | DNS only (grey cloud) |"
           } >> "$GITHUB_STEP_SUMMARY"
         working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Terraform Plan
+        run: |
+          set -o pipefail
+          terraform plan -no-color -input=false -lock-timeout=5m -var-file=dev.tfvars -out=tfplan 2>&1 | tee plan.log \
+            || { echo "=== ERRORS ==="; grep -n -B2 -A10 'Error:' plan.log; exit 1; }
+        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
+          MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
+          TF_VAR_atlas_org_id: ${{ secrets.MONGODB_ATLAS_ORG_ID }}
+          TF_VAR_grafana_cloud_access_policy_token: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
+          TF_VAR_grafana_otlp_token: ${{ secrets.GRAFANA_OTLP_TOKEN }}
+          TF_VAR_kashier_secret_key: ${{ secrets.KASHIER_SECRET_KEY }}
+          TF_VAR_kashier_api_key: ${{ secrets.KASHIER_API_KEY }}
+          TF_VAR_kashier_merchant_id: ${{ secrets.KASHIER_MERCHANT_ID }}
 
       - name: Terraform Apply
         run: terraform apply -input=false -lock-timeout=5m tfplan
