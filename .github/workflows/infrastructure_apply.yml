@@ -71,30 +71,6 @@ jobs:
           output_format: cli
           soft_fail: true
 
-      - name: Request ACM certificate early
-        run: terraform apply -auto-approve -input=false -var-file=dev.tfvars -target=module.acm.aws_acm_certificate.site
-        working-directory: ${{ env.WORKING_DIR }}
-
-      - name: Show DNS record to add
-        run: |
-          ARN=$(terraform output -raw acm_pending_certificate_arn)
-          aws acm describe-certificate --region us-east-1 --certificate-arn "$ARN" \
-            --query 'Certificate.DomainValidationOptions[0].ResourceRecord' --output json > rr.json
-
-          NAME=$(jq -r '.Name' rr.json | sed -E 's/\.[^.]+\.[^.]+\.$//')
-          TARGET=$(jq -r '.Value' rr.json)
-
-          {
-            echo "## Add this DNS record, then the apply will continue and wait for it"
-            echo "| Field | Value |"
-            echo "|---|---|"
-            echo "| Type | \`CNAME\` |"
-            echo "| Name | \`$NAME\` |"
-            echo "| Target | \`$TARGET\` |"
-            echo "| Proxy status | DNS only (grey cloud) |"
-          } >> "$GITHUB_STEP_SUMMARY"
-        working-directory: ${{ env.WORKING_DIR }}
-
       - name: Terraform Plan
         run: |
           set -o pipefail
@@ -112,8 +88,66 @@ jobs:
           TF_VAR_kashier_merchant_id: ${{ secrets.KASHIER_MERCHANT_ID }}
 
       - name: Terraform Apply
-        run: terraform apply -input=false -lock-timeout=5m tfplan
+        run: |
+          set -o pipefail
+
+          DOMAIN=$(grep -Po '(?<=domain_name = ")[^"]+' dev.tfvars)
+
+          # Background watcher: polls ACM directly via AWS CLI, independent of Terraform.
+          # Posts the DNS record to the job summary the moment the cert exists and is pending.
+          (
+            for i in $(seq 1 90); do
+              ARN=$(aws acm list-certificates --region us-east-1 \
+                --query "CertificateSummaryList[?DomainName=='${DOMAIN}'].CertificateArn | [0]" \
+                --output text 2>/dev/null)
+
+              if [ -n "$ARN" ] && [ "$ARN" != "None" ]; then
+                STATUS=$(aws acm describe-certificate --region us-east-1 --certificate-arn "$ARN" \
+                  --query 'Certificate.Status' --output text)
+
+                if [ "$STATUS" = "PENDING_VALIDATION" ]; then
+                  aws acm describe-certificate --region us-east-1 --certificate-arn "$ARN" \
+                    --query 'Certificate.DomainValidationOptions[0].ResourceRecord' --output json > rr.json
+                  NAME=$(jq -r '.Name' rr.json | sed -E 's/\.[^.]+\.[^.]+\.$//')
+                  TARGET=$(jq -r '.Value' rr.json)
+                  {
+                    echo "## Add this DNS record now — apply is waiting on it"
+                    echo "| Field | Value |"
+                    echo "|---|---|"
+                    echo "| Type | \`CNAME\` |"
+                    echo "| Name | \`$NAME\` |"
+                    echo "| Target | \`$TARGET\` |"
+                    echo "| Proxy status | DNS only (grey cloud) |"
+                  } >> "$GITHUB_STEP_SUMMARY"
+                  exit 0
+                elif [ "$STATUS" = "ISSUED" ]; then
+                  exit 0
+                fi
+              fi
+              sleep 10
+            done
+          ) &
+          WATCHER_PID=$!
+
+          terraform apply -no-color -input=false -lock-timeout=5m -json tfplan | tee apply.jsonl
+          APPLY_EXIT=$?
+
+          kill "$WATCHER_PID" 2>/dev/null || true
+          exit $APPLY_EXIT
         working-directory: ${{ env.WORKING_DIR }}
         env:
           MONGODB_ATLAS_PUBLIC_API_KEY: ${{ secrets.MONGODB_ATLAS_PUBLIC_API_KEY }}
           MONGODB_ATLAS_PRIVATE_API_KEY: ${{ secrets.MONGODB_ATLAS_PRIVATE_API_KEY }}
+
+      - name: Build checklist
+        if: always()
+        run: |
+          {
+            echo "## Apply checklist"
+            echo "| Resource | Action | Result |"
+            echo "|---|---|---|"
+            jq -r 'select(.type=="apply_complete") |
+              "| \(.hook.resource.addr) | \(.hook.action) | ✅ |"' "${{ env.WORKING_DIR }}/apply.jsonl"
+            jq -r 'select(.type=="diagnostic" and .diagnostic.severity=="error") |
+              "| \(.diagnostic.summary) | — | ❌ |"' "${{ env.WORKING_DIR }}/apply.jsonl"
+          } >> "$GITHUB_STEP_SUMMARY"
