@@ -13,9 +13,6 @@ concurrency:
 
 env:
   VERSION: ${{ github.event.release.tag_name || github.sha }}
-  S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
-  CODEDEPLOY_APP_NAME: ${{ secrets.CODEDEPLOY_APP_NAME }}
-  CODEDEPLOY_GROUP_NAME: ${{ secrets.CODEDEPLOY_GROUP_NAME }}
 
 jobs:
   deploy:
@@ -36,7 +33,10 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-backend-deploy
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Load deploy config
+        uses: ./.github/actions/load-deploy-config
 
       # Production dependencies are installed inside deploy/, so the cached
       # root node_modules is never touched.
@@ -55,14 +55,14 @@ jobs:
           KEY="backend/backend-${VERSION}.tar.gz"
 
           VERSION_ID=$(aws s3api put-object \
-            --bucket "$S3_BUCKET_NAME" --key "$KEY" \
+            --bucket "$ARTIFACTS_BUCKET" --key "$KEY" \
             --body backend-artifact.tar.gz \
             --query VersionId --output text)
 
           DEPLOYMENT_ID=$(aws deploy create-deployment \
             --application-name "$CODEDEPLOY_APP_NAME" \
             --deployment-group-name "$CODEDEPLOY_GROUP_NAME" \
-            --s3-location "bucket=$S3_BUCKET_NAME,key=$KEY,bundleType=tgz,version=$VERSION_ID" \
+            --s3-location "bucket=$ARTIFACTS_BUCKET,key=$KEY,bundleType=tgz,version=$VERSION_ID" \
             --file-exists-behavior OVERWRITE \
             --description "Backend $VERSION" \
             --query deploymentId --output text)

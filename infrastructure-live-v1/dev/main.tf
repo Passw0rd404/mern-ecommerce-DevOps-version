@@ -1,4 +1,19 @@
-# ============================================================
+
+# Single source of truth for the deploy workflows
+resource "aws_ssm_parameter" "deploy_config" {
+  name = "/mern/dev/deploy-config"
+  type = "String"
+  value = jsonencode({
+    ARTIFACTS_BUCKET      = module.s3.artifacts_bucket_name
+    FRONTEND_BUCKET       = module.s3.frontend_bucket_name
+    CODEDEPLOY_APP_NAME   = module.code_deploy.app_name
+    CODEDEPLOY_GROUP_NAME = module.code_deploy.deployment_group_name
+    KVS_ARN               = module.cloud_front.kvs_arn
+    SITE_URL              = "https://${module.cloud_front.distribution_domain_name}"
+    PUBLIC_URL            = "https://${local.domain_name}"
+  })
+}
+============================================================
 # PROVIDERS
 # ============================================================
 

@@ -183,6 +183,11 @@ data "aws_iam_policy_document" "backend_deploy" {
     actions   = ["codedeploy:GetDeployment"]
     resources = ["*"]
   }
+  statement {
+    sid       = "ReadDeployConfig"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${local.region}:${local.acct}:parameter/${var.project}/${var.env}/deploy-config"]
+  }
 }
 
 resource "aws_iam_role_policy" "backend_deploy" {
@@ -231,6 +236,12 @@ data "aws_iam_policy_document" "frontend_release" {
     sid       = "FindKeyValueStore"
     actions   = ["cloudfront:ListKeyValueStores"]
     resources = ["*"]
+  }
+
+  statement {
+    sid       = "ReadDeployConfig"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${local.region}:${local.acct}:parameter/${var.project}/${var.env}/deploy-config"]
   }
 }
 

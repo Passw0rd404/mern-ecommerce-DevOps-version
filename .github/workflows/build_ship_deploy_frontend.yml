@@ -13,9 +13,6 @@ concurrency:
 
 env:
   VERSION: ${{ github.event.release.tag_name || github.sha }}
-  FRONTEND_BUCKET: ${{ secrets.LIVE_FRONTEND_BUCKET_NAME }}
-  ARTIFACTS_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
-  SITE_URL: ${{ secrets.SITE_URL }}
 
 jobs:
   release:
@@ -47,13 +44,10 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-frontend-release
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Find the key-value store
-        run: |
-          KVS_ARN=$(aws cloudfront list-key-value-stores \
-            --query "KeyValueStoreList.Items[?Name=='frontend-release'].ARN | [0]" --output text)
-          echo "KVS_ARN=$KVS_ARN" >> "$GITHUB_ENV"
+      - name: Load deploy config
+        uses: ./.github/actions/load-deploy-config
 
       # Backup first: if anything below fails, the release is still recoverable
       - name: Archive build to artifacts bucket

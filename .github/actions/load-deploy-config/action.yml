@@ -1,0 +1,16 @@
+name: Load deploy config
+description: Reads the config Terraform published to SSM and exports it as env vars
+inputs:
+  name:
+    description: SSM parameter name
+    default: /mern/dev/deploy-config
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PARAM_NAME: ${{ inputs.name }}
+      run: |
+        CONFIG=$(aws ssm get-parameter --name "$PARAM_NAME" \
+          --query Parameter.Value --output text)
+        echo "$CONFIG" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
