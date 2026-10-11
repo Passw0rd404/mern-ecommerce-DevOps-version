@@ -42,8 +42,8 @@ jobs:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-frontend-release
           aws-region: ${{ vars.AWS_REGION }}
 
-       - name: Load deploy config
-         uses: ./.github/actions/load-deploy-config
+      - name: Load deploy config
+        uses: ./.github/actions/load-deploy-config
         with:
           environment: ${{ inputs.environment }}
 
