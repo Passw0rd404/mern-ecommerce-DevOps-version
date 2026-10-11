@@ -250,7 +250,7 @@ output "role_arns" {
 }
 
 resource "aws_s3_bucket" "tfstate" {
-  bucket = "tfstate-mern-dev"
+  bucket = "tfstate-mern-dev-${local.acct}"
 
   lifecycle {
     prevent_destroy = true
