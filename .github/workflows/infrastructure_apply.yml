@@ -72,7 +72,7 @@ jobs:
           soft_fail: true
 
       - name: Request ACM certificate early
-        run: terraform apply -auto-approve -input=false -target=module.acm.aws_acm_certificate.site
+        run: terraform apply -auto-approve -input=false -var-file=dev.tfvars -target=module.acm.aws_acm_certificate.site
         working-directory: ${{ env.WORKING_DIR }}
 
       - name: Show DNS record to add
