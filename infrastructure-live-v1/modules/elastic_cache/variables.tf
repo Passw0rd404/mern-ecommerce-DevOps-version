@@ -75,3 +75,9 @@ variable "kms_key_arn" {
   type        = string
   default     = null
 }
+
+variable "enable_autoscaling" {
+  description = "Let Application Auto Scaling manage replicas per shard. Not supported on every node type (t4g.small was rejected), so it is off by default."
+  type        = bool
+  default     = false
+}

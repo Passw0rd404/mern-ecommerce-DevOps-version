@@ -70,6 +70,7 @@ resource "aws_elasticache_replication_group" "main" {
 }
 
 resource "aws_appautoscaling_target" "replicas" {
+  count = var.enable_autoscaling ? 1 : 0
   service_namespace  = "elasticache"
   scalable_dimension = "elasticache:replication-group:Replicas"
   resource_id        = "replication-group/${aws_elasticache_replication_group.main.replication_group_id}"
@@ -81,15 +82,20 @@ resource "aws_appautoscaling_target" "replicas" {
       condition     = var.max_replicas >= var.min_replicas
       error_message = "max_replicas must be greater than or equal to min_replicas."
     }
+    precondition {
+      condition     = !startswith(var.elasticache_node_type, "cache.t")
+      error_message = "Autoscaling was rejected by AWS for cache.t4g.small. Use a larger node class or set enable_autoscaling = false."
+    }
   }
 }
 
 resource "aws_appautoscaling_policy" "replicas_cpu" {
+  count = var.enable_autoscaling ? 1 : 0
   name               = "valkey-replicas-cpu"
   policy_type        = "TargetTrackingScaling"
-  service_namespace  = aws_appautoscaling_target.replicas.service_namespace
-  scalable_dimension = aws_appautoscaling_target.replicas.scalable_dimension
-  resource_id        = aws_appautoscaling_target.replicas.resource_id
+  service_namespace  = aws_appautoscaling_target.replicas[0].service_namespace
+  scalable_dimension = aws_appautoscaling_target.replicas[0].scalable_dimension
+  resource_id        = aws_appautoscaling_target.replicas[0].resource_id
 
   target_tracking_scaling_policy_configuration {
     target_value       = var.replica_cpu_target
@@ -100,4 +106,14 @@ resource "aws_appautoscaling_policy" "replicas_cpu" {
       predefined_metric_type = "ElastiCacheReplicaEngineCPUUtilization"
     }
   }
+}
+
+moved {
+  from = aws_appautoscaling_target.replicas
+  to   = aws_appautoscaling_target.replicas[0]
+}
+
+moved {
+  from = aws_appautoscaling_policy.replicas_cpu
+  to   = aws_appautoscaling_policy.replicas_cpu[0]
 }
