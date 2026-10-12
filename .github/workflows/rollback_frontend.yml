@@ -1,18 +1,25 @@
+
 name: Frontend - Rollback
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release tag to roll back to (e.g. v1.0.1)'
+        description: 'Full Git commit SHA of the release to restore'
+        type: string
         required: true
       environment:
         description: 'Environment to roll back'
+        type: choice
+        options:
+          - dev
         default: dev
+        required: true
 
 permissions:
   contents: read
   id-token: write
+
 concurrency:
   group: frontend-release
   cancel-in-progress: false
@@ -30,6 +37,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate version
+        shell: bash
         run: |
           if ! [[ "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
             echo "Invalid version: $VERSION"
@@ -48,17 +56,35 @@ jobs:
           environment: ${{ inputs.environment }}
 
       - name: Restore version if it is missing from the live bucket
+        shell: bash
         run: |
-          if aws s3api head-object --bucket "$FRONTEND_BUCKET" \
-               --key "$VERSION/index.html" > /dev/null 2>&1; then
-            echo "Version $VERSION is still in the frontend bucket."
+          set -euo pipefail
+
+          if aws s3api head-object \
+            --bucket "$FRONTEND_BUCKET" \
+            --key "$VERSION/index.html" >/dev/null 2>&1; then
+            echo "Version $VERSION is already present."
           else
             echo "Restoring $VERSION from the artifacts bucket..."
-            aws s3 cp "s3://$ARTIFACTS_BUCKET/frontend/frontend-$VERSION.tar.gz" restore.tar.gz
+
+            aws s3 cp \
+              "s3://$ARTIFACTS_BUCKET/frontend/frontend-$VERSION.tar.gz" \
+              restore.tar.gz
+
             mkdir restore_dir
             tar -xzf restore.tar.gz -C restore_dir
-            bash .github/scripts/upload-frontend.sh restore_dir "$FRONTEND_BUCKET" "$VERSION"
+
+            test -f restore_dir/index.html || {
+              echo "::error::Archive does not contain index.html at its root."
+              exit 1
+            }
+
+            bash .github/scripts/upload-frontend.sh \
+              restore_dir "$FRONTEND_BUCKET" "$VERSION"
           fi
 
       - name: Switch live version
-        run: bash .github/scripts/switch-frontend.sh "$VERSION"
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/switch-frontend.sh "$VERSION"
