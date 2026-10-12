@@ -49,5 +49,8 @@ sudo sed \
   -e "s|__GRAFANA_OTLP_TOKEN__|${GRAFANA_OTLP_TOKEN}|g" \
   /etc/alloy/config.alloy.tmpl | sudo tee /etc/alloy/config.alloy > /dev/null
 
-sudo chmod 600 /etc/alloy/config.alloy
+sudo chown root:alloy /etc/alloy/config.alloy
+sudo chmod 640 /etc/alloy/config.alloy
+sudo systemctl reset-failed alloy || true
+
 sudo systemctl restart alloy

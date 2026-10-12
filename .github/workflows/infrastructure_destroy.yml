@@ -101,3 +101,6 @@ jobs:
               --tag-filters Key=Project,Values=mern \
               --query 'ResourceTagMappingList[].ResourceARN' --output text | tr '\t' '\n'
           done
+
+      - name: Reminder
+        run: echo "::warning::Delete the dev CNAME in your DNS before the next apply, or CloudFront returns CNAMEAlreadyExists."
