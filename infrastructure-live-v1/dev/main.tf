@@ -200,20 +200,20 @@ module "vpc" {
       service_name        = var.grafana_privatelink_service_name
       from_port           = 443
       to_port             = 443
-      private_dns_enabled = false
+      private_dns_enabled = true
     }
   }
 }
 
 # Grafana PrivateLink: private_dns_enabled = false, so map the OTLP hostname to the endpoint
-module "grafana_dns" {
-  source = "../modules/route53"
-
-  vpc_id         = module.vpc.vpc_id
-  url            = var.grafana_otlp_endpoint
-  alias_dns_name = module.vpc.interface_endpoint_dns["grafana"][0].dns_name
-  alias_zone_id  = module.vpc.interface_endpoint_dns["grafana"][0].hosted_zone_id
-}
+# module "grafana_dns" {
+#   source = "../modules/route53"
+#
+#   vpc_id         = module.vpc.vpc_id
+#   url            = var.grafana_otlp_endpoint
+#   alias_dns_name = module.vpc.interface_endpoint_dns["grafana"][0].dns_name
+#   alias_zone_id  = module.vpc.interface_endpoint_dns["grafana"][0].hosted_zone_id
+# }
 
 # ============================================================
 # S3

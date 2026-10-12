@@ -1,0 +1,85 @@
+name: DNS records
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to show the DNS records for'
+        default: dev
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gha-terraform
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Load deploy config
+        uses: ./.github/actions/load-deploy-config
+        with:
+          environment: ${{ inputs.environment }}
+
+      - name: Show DNS records
+        run: |
+          DOMAIN="${PUBLIC_URL#https://}"
+          CF_TARGET="${SITE_URL#https://}"
+
+          # Cloudflare appends the zone itself, so show the name without the last two labels
+          short() { echo "$1" | sed -E 's/\.[^.]+\.[^.]+\.?$//'; }
+
+          ARN=$(aws acm list-certificates --region us-east-1 \
+            --query "CertificateSummaryList[?DomainName=='${DOMAIN}'].CertificateArn | [0]" \
+            --output text)
+          if [ -z "$ARN" ] || [ "$ARN" = "None" ]; then
+            echo "::error::No ACM certificate for $DOMAIN in us-east-1. Has Terraform apply run?"
+            exit 1
+          fi
+
+          STATUS=$(aws acm describe-certificate --region us-east-1 --certificate-arn "$ARN" \
+            --query 'Certificate.Status' --output text)
+          RR=$(aws acm describe-certificate --region us-east-1 --certificate-arn "$ARN" \
+            --query 'Certificate.DomainValidationOptions[0].ResourceRecord' --output json)
+
+          ACM_NAME=$(echo "$RR" | jq -r '.Name // empty')
+          ACM_VALUE=$(echo "$RR" | jq -r '.Value // empty')
+          if [ -z "$ACM_NAME" ]; then
+            echo "::error::ACM has not produced a validation record yet. Retry in a minute."
+            exit 1
+          fi
+
+          {
+            echo "## DNS records for \`$DOMAIN\`"
+            echo
+            echo "Certificate status: **$STATUS**"
+            echo
+            echo "| # | Purpose | Type | Name | Target | Proxy |"
+            echo "|---|---|---|---|---|---|"
+            printf '| 1 | ACM validation | `CNAME` | `%s` | `%s` | DNS only (grey cloud) |\n' \
+              "$(short "$ACM_NAME")" "$ACM_VALUE"
+            printf '| 2 | Site (CloudFront) | `CNAME` | `%s` | `%s` | DNS only (grey cloud) |\n' \
+              "$(short "$DOMAIN")" "$CF_TARGET"
+            echo
+            echo "Full names, if your DNS provider does not append the zone:"
+            echo
+            printf -- '- ACM: `%s`\n' "$ACM_NAME"
+            printf -- '- Site: `%s`\n' "$DOMAIN"
+            echo
+            echo "### Notes"
+            echo "- Record 1 validates the certificate. Keep it, because ACM uses it to renew."
+            echo "- Add record 2 after Terraform apply. Delete it before a destroy and rebuild, or CloudFront returns \`CNAMEAlreadyExists\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "ACM:  $ACM_NAME -> $ACM_VALUE"
+          echo "Site: $DOMAIN -> $CF_TARGET"
