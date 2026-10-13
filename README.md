@@ -2,6 +2,8 @@
 
 An e-commerce application with a React storefront, an Express/MongoDB backend, and AWS-based deployment infrastructure. It supports customer authentication, product management, carts, coupons, Kashier checkout, an admin dashboard, sales analytics, and Redis caching.
 
+[Read the full project case study](https://abdullahsameh.tech/blog/mern)
+
 ![E-Commerce storefront and stack](./diagrams/mern-aws.png)
 
 ## Technologies and features
