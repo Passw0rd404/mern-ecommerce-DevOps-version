@@ -84,6 +84,8 @@ export const useCartStore = create((set, get) => ({
 	},
 	calculateTotals: () => {
 		const { cart, coupon } = get();
+		// Totals are derived from the current cart and coupon state rather than
+		// stored separately, preventing stale totals after quantity changes.
 		const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 		let total = subtotal;
 

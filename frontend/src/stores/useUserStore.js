@@ -57,7 +57,8 @@ export const useUserStore = create((set, get) => ({
 	},
 
 	refreshToken: async () => {
-		// Prevent multiple simultaneous refresh attempts
+		// The response interceptor uses checkingAuth as a lock so concurrent
+		// failed requests do not start multiple refresh calls.
 		if (get().checkingAuth) return;
 
 		set({ checkingAuth: true });
@@ -72,9 +73,8 @@ export const useUserStore = create((set, get) => ({
 	},
 }));
 
-// TODO: Implement the axios interceptors for refreshing access token
-
-// Axios interceptor for token refresh
+// Retry one failed request after refreshing the short-lived access token.
+// A shared promise prevents a burst of 401 responses from racing refreshes.
 let refreshPromise = null;
 
 axios.interceptors.response.use(

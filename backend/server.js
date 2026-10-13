@@ -32,6 +32,8 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/health", healthRoutes);
 
 if (process.env.NODE_ENV === "production") {
+	// Production serves the built SPA from the backend process; API routes
+	// above remain available while unknown browser routes receive index.html.
 	app.use(express.static(path.join(__dirname, "/frontend/dist")));
 
 	app.get("*", (req, res) => {

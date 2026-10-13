@@ -10,6 +10,8 @@ export const protectRoute = async (req, res, next) => {
 		}
 
 		try {
+			// The access token is checked on every protected request; the
+			// refresh token is handled separately by the auth endpoints.
 			const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
 			const user = await User.findById(decoded.userId).select("-password");
 
@@ -33,6 +35,8 @@ export const protectRoute = async (req, res, next) => {
 };
 
 export const adminRoute = (req, res, next) => {
+	// protectRoute must run first so this middleware can authorize the
+	// authenticated user's role without trusting a client-provided value.
 	if (req.user && req.user.role === "admin") {
 		next();
 	} else {

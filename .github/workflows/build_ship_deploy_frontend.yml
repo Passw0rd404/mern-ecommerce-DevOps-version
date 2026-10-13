@@ -63,7 +63,10 @@ jobs:
             "s3://$ARTIFACTS_BUCKET/frontend/frontend-$VERSION.tar.gz"
 
       - name: Upload to versioned prefix
+        # Keep each build immutable so the active version can be switched or
+        # rolled back without rebuilding the frontend.
         run: bash .github/scripts/upload-frontend.sh frontend/dist "$FRONTEND_BUCKET" "$VERSION"
 
       - name: Switch live version
+        # The CloudFront function reads this pointer to select the active build.
         run: bash .github/scripts/switch-frontend.sh "$VERSION"

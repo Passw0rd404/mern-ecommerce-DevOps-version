@@ -14,6 +14,8 @@ const OrderSummary = () => {
 
 	const handlePayment = async () => {
 		try {
+			// The backend creates and signs the payment session; the browser
+			// then leaves the app for the provider-hosted checkout page.
 			const res = await axios.post("/payments/create-checkout-session", {
 				products: cart,
 				couponCode: coupon ? coupon.code : null,

@@ -14,7 +14,8 @@ export const getAllProducts = async (req, res) => {
 
 export const getFeaturedProducts = async (req, res) => {
 	try {
-		// Redis is only a cache here: if it fails, skip it and use MongoDB
+		// Redis is only a cache here: if it fails, skip it and use MongoDB.
+		// Product reads must remain available when the cache is unavailable.
 		try {
 			const cached = await redis.get("featured_products");
 			if (cached) {

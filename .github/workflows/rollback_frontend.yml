@@ -56,6 +56,8 @@ jobs:
           environment: ${{ inputs.environment }}
 
       - name: Restore version if it is missing from the live bucket
+        # Releases are recoverable from the versioned artifact archive even if
+        # their immutable frontend prefix was removed from the live bucket.
         shell: bash
         run: |
           set -euo pipefail

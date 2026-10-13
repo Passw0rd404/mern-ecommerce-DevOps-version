@@ -34,6 +34,8 @@ jobs:
         env:
           CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
+          # Require an explicit phrase because this workflow permanently
+          # removes the development environment.
           if [ "$CONFIRM" != "destroy-dev" ]; then
             echo "Confirmation text did not match. Nothing was destroyed."
             exit 1

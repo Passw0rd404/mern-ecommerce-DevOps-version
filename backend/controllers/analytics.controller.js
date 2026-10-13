@@ -59,6 +59,8 @@ export const getDailySalesData = async (startDate, endDate) => {
 		const dateArray = getDatesInRange(startDate, endDate);
 		// console.log(dateArray) // ['2024-08-18', '2024-08-19', ... ]
 
+		// Add zero-value days so charts have a continuous date axis even when
+		// no orders were recorded on a particular day.
 		return dateArray.map((date) => {
 			const foundData = dailySalesData.find((item) => item._id === date);
 

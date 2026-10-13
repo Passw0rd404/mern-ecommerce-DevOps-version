@@ -35,6 +35,8 @@ const CreateProductForm = () => {
 				setNewProduct({ ...newProduct, image: reader.result });
 			};
 
+			// Send the selected image in the request body so the backend can
+			// optimize it before storing it in the private object bucket.
 			reader.readAsDataURL(file); // base64
 		}
 	};

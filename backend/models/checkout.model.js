@@ -7,6 +7,8 @@ const checkoutSchema = new mongoose.Schema({
 	couponCode: { type: String, default: null },
 	totalAmount: { type: Number, required: true },
   kashierSessionId: String,
+	// Unfinished payment sessions are temporary; MongoDB's TTL index removes
+	// them after seven days so abandoned checkouts do not accumulate forever.
 	createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 7 },
 });
 

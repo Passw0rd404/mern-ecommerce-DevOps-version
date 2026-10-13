@@ -49,6 +49,8 @@ resource "aws_vpc_security_group_egress_rule" "nlb_to_app" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "app_from_nlb" {
+  # Instances are reachable only through the internal NLB; CloudFront is the
+  # public entry point and never connects directly to the application port.
   security_group_id            = aws_security_group.app.id
   description                  = "App port from the NLB only"
   ip_protocol                  = "tcp"
@@ -105,6 +107,8 @@ resource "aws_launch_template" "app" {
   }
 
   metadata_options {
+    # Require IMDSv2 and keep the metadata hop limit to one to reduce
+    # exposure of instance credentials to processes behind the instance.
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 1

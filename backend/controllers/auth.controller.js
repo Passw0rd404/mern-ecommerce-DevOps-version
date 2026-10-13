@@ -3,6 +3,8 @@ import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 
 const generateTokens = (userId) => {
+	// Keep access tokens short-lived while the Redis-backed refresh token
+	// allows the session to continue without re-entering credentials.
 	const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
 		expiresIn: "15m",
 	});
@@ -15,6 +17,8 @@ const generateTokens = (userId) => {
 };
 
 const storeRefreshToken = async (userId, refreshToken) => {
+	// Storing one token per user lets logout and refresh invalidate the
+	// server-side session instead of trusting the JWT alone.
 	await redis.set(`refresh_token:${userId}`, refreshToken, "EX", 7 * 24 * 60 * 60); // 7days
 };
 

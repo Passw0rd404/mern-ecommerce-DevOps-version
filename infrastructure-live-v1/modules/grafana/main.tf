@@ -5,6 +5,7 @@ data "grafana_cloud_stack" "this" {
 resource "grafana_cloud_provider_aws_account" "this" {
   stack_id = data.grafana_cloud_stack.this.id
   role_arn = var.cloudwatch_role_arn
+  # CloudFront publishes its metrics in the us-east-1 AWS region.
   regions  = concat(var.aws_regions, ["us-east-1"]) # us-east-1 added: CloudFront only publishes metrics there
 }
 

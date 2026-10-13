@@ -55,6 +55,8 @@ jobs:
   build-ami:
     name: Build AMI
     runs-on: ubuntu-latest
+    # Do not create an AMI until formatting, initialization, and validation
+    # have passed in the separate validation job.
     needs: validate-packer
     outputs:
       ami_id: ${{ steps.build.outputs.ami_id }}
@@ -93,6 +95,8 @@ jobs:
   verify-ami:
     name: Verify AMI
     runs-on: ubuntu-latest
+    # Waiting for availability catches incomplete image publication before the
+    # AMI ID is used by Terraform or an instance refresh.
     needs: build-ami
     steps:
       - name: Configure AWS Credentials

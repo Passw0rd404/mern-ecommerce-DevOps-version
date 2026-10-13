@@ -49,6 +49,8 @@ resource "aws_vpc_security_group_ingress_rule" "atlas_endpoint" {
 }
 
 resource "aws_vpc_endpoint" "atlas" {
+  # Atlas supplies its own endpoint DNS name, so AWS private DNS is disabled
+  # and the application uses the private SRV connection string selected above.
   vpc_id              = var.vpc_id
   service_name        = mongodbatlas_privatelink_endpoint.this.endpoint_service_name
   vpc_endpoint_type   = "Interface"

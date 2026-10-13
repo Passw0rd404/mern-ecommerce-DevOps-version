@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const connectDB = async (maxAttempts = 5) => {
+	// Retry transient startup failures because the database may become
+	// reachable shortly after the application instance boots.
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		try {
 			const conn = await mongoose.connect(process.env.MONGO_URI, {

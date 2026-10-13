@@ -12,6 +12,8 @@ const PurchaseSuccessPage = () => {
   const navigate = useNavigate();
 
 	useEffect(() => {
+		// Kashier returns signed query parameters; the backend verifies them and
+		// creates the order before the cart is cleared locally.
     const handleCheckoutSuccess = async (params) => {
 			try {
         await axios.post("/payments/checkout-success", { params });

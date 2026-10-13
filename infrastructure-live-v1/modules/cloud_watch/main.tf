@@ -1,5 +1,7 @@
 data "aws_iam_policy_document" "trust_grafana" {
   statement {
+    # The external ID prevents an unrelated Grafana tenant from assuming this
+    # cross-account role through a confused-deputy request.
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
     principals {
@@ -47,6 +49,8 @@ resource "aws_iam_role_policy" "grafana_cloudwatch" {
 }
 
 resource "time_sleep" "wait_iam_propagation" {
+  # Grafana may assume the role immediately after creation; allow IAM
+  # propagation to complete before dependent observability resources run.
   depends_on      = [aws_iam_role.grafana_cloudwatch, aws_iam_role_policy.grafana_cloudwatch]
   create_duration = "10s"
 }

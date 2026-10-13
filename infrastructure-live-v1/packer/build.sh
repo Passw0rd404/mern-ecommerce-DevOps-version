@@ -22,6 +22,8 @@ node -v | grep -q "^v${NODE_MAJOR}\." || { echo "Wrong Node version: $(node -v)"
 sudo npm install -g pm2
 
 # 5. CodeDeploy agent (IMDSv2: get a token first, then the region)
+# Read the region from instance metadata so the installer URL matches the
+# region where the AMI is being built.
 TOKEN=$(curl -fsS -X PUT "http://169.254.169.254/latest/api/token" \
   -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
 REGION=$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" \

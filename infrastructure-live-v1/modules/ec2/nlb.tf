@@ -1,4 +1,6 @@
 resource "aws_lb" "app" {
+  # CloudFront reaches this load balancer through its VPC origin, so the NLB
+  # remains private instead of exposing a second public entry point.
   name               = "${var.name}-nlb"
   load_balancer_type = "network"
   internal           = true

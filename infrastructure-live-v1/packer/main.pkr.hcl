@@ -56,6 +56,8 @@ source "amazon-ebs" "amazon_linux" {
 build {
   sources = ["source.amazon-ebs.amazon_linux"]
 
+  # Alloy configuration is copied to the image as a template; environment
+  # specific secrets and endpoints are supplied when an instance launches.
   provisioner "file" {
     source      = "${path.root}/alloy-config.alloy.tmpl"
     destination = "/tmp/config.alloy.tmpl"

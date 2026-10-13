@@ -11,6 +11,8 @@ runs:
       env:
         PARAM_NAME: /mern/${{ inputs.environment }}/deploy-config
       run: |
+        # Terraform stores the non-secret deployment values as JSON; exporting
+        # each entry through GITHUB_ENV makes them available to later steps.
         CONFIG=$(aws ssm get-parameter --name "$PARAM_NAME" \
           --query Parameter.Value --output text)
         echo "$CONFIG" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"

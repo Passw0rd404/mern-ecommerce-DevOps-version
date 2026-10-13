@@ -20,6 +20,8 @@ async function handler(event) {
   const uri = request.uri;
   const last = uri.substring(uri.lastIndexOf('/') + 1);
 
+  // Keep versioned static assets addressable directly while rewriting SPA
+  // routes to the build's entry document for client-side routing.
   // Files with an extension (JS, CSS, images) keep their path.
   // Everything else is a client-side route, so serve index.html.
   request.uri = '/' + version + (last.includes('.') ? uri : '/index.html');

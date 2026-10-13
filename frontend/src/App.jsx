@@ -20,6 +20,8 @@ function App() {
 	const { user, checkAuth, checkingAuth } = useUserStore();
 	const { getCartItems } = useCartStore();
 	useEffect(() => {
+		// Authentication is checked before routing so protected pages do not
+		// briefly render while the existing session is still being resolved.
 		checkAuth();
 	}, [checkAuth]);
 
