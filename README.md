@@ -23,7 +23,9 @@ The application is delivered through CloudFront. API requests reach the private 
 
 GitHub Actions workflows cover AMI creation, infrastructure apply and destroy, backend deployment, frontend release and rollback, AWS OIDC checks, and code quality/security checks.
 
-![CI/CD workflows](./diagrams/cicd.png)
+![Application delivery CI/CD](./diagrams/cicd-1.png)
+
+![Infrastructure CI/CD and lifecycle automation](./diagrams/cicd-2.png)
 
 ## Repository structure
 
