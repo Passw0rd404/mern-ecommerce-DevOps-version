@@ -6,6 +6,10 @@ An e-commerce application with a React storefront, an Express/MongoDB backend, a
 
 [Read the project prerequisites](./PREREQUISITES.md)
 
+Want to see more projects? Visit the [project portfolio](https://abdullahsameh.tech/projects).
+
+Want to know more about the creator? Visit the [About page](https://abdullahsameh.tech/about).
+
 ![E-Commerce storefront and stack](./diagrams/mern-aws.png)
 
 ## Technologies and features

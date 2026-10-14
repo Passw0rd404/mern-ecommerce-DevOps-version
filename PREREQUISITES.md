@@ -147,14 +147,198 @@ Use test payment credentials for local development. The production deployment ob
 
 ## Recommended setup order
 
-1. Install the local tools.
-2. Create the AWS, GitHub, MongoDB Atlas, Grafana Cloud, Kashier, and DNS accounts or permissions.
-3. Configure `dev.tfvars` and GitHub Actions secrets.
-4. Apply the bootstrap Terraform stack.
-5. Build and verify an AMI with the AMI workflow.
-6. Apply the development infrastructure with `infrastructure_apply.yml`.
-7. Add the DNS records reported by the workflow.
-8. Deploy the backend and release the frontend.
-9. Use the rollback workflows and destroy workflow only when intentionally required.
+Complete the following steps in order. The infrastructure and deployment workflows are manual; starting one workflow does not automatically start the next one.
+
+### 1. Install the local tools
+
+Install the tools listed in [Required local tools](#required-local-tools). Confirm the main CLI versions:
+
+```bash
+node --version
+npm --version
+terraform version
+aws --version
+packer version
+```
+
+### 2. Create the required accounts and permissions
+
+Create or obtain access to:
+
+- An AWS account with permission to run the bootstrap stack.
+- A GitHub repository where Actions and repository variables/secrets can be configured.
+- A MongoDB Atlas organization and API keys.
+- A Grafana Cloud stack, CloudWatch integration, OTLP credentials, and PrivateLink service.
+- A Kashier test account for development or a live merchant account for production.
+- A DNS provider account with permission to manage the selected domain.
+
+Use the exact GitHub repository owner and name when configuring the bootstrap stack because the GitHub OIDC trust policy is restricted to that repository.
+
+### 3. Configure Terraform variables and GitHub secrets
+
+Edit:
+
+```text
+infrastructure-live-v1/dev/dev.tfvars
+```
+
+Replace the example domain and Grafana values with values from your own accounts. Do not put sensitive API keys or tokens in this file if it will be committed.
+
+In the GitHub repository, open **Settings → Secrets and variables → Actions** and add:
+
+- Repository variable: `AWS_ACCOUNT_ID`
+- Repository variable: `AWS_REGION` with value `eu-central-1`
+- Secrets listed in [GitHub Actions Secrets](#github-actions-secrets)
+
+The workflows read these values from `${{ vars.* }}` and `${{ secrets.* }}`. The repository variable `AWS_ACCOUNT_ID` is used to construct the OIDC role ARNs and Terraform state bucket name.
+
+### 4. Apply the AWS bootstrap stack
+
+The bootstrap Terraform code is located at:
+
+```text
+infrastructure-live-v1/bootstrap
+```
+
+This is the first Terraform stack to apply. Run it locally with an AWS administrator profile:
+
+```bash
+cd infrastructure-live-v1/bootstrap
+aws configure --profile <your-admin-profile>
+aws sts get-caller-identity --profile <your-admin-profile>
+terraform init
+terraform apply \
+  -var='github_repo=OWNER/REPOSITORY' \
+  -var='project=mern' \
+  -var='env=dev'
+```
+
+If you use a named profile, export it before running Terraform:
+
+```bash
+export AWS_PROFILE=<your-admin-profile>
+```
+
+The bootstrap stack creates the GitHub Actions OIDC provider, the four workflow IAM roles, and the encrypted/versioned Terraform state bucket. It must be applied before any GitHub Actions workflow that assumes `gha-terraform`, `gha-packer`, `gha-backend-deploy`, or `gha-frontend-release`.
+
+After the apply completes, confirm that the output role ARNs exist and that the state bucket name matches the bucket used by the workflows:
+
+```bash
+terraform output
+aws iam get-role --role-name gha-terraform
+aws iam get-role --role-name gha-packer
+aws iam get-role --role-name gha-backend-deploy
+aws iam get-role --role-name gha-frontend-release
+```
+
+### 5. Build and verify an AMI
+
+In GitHub, open **Actions → Build AMI**. This workflow is defined at:
+
+```text
+.github/workflows/ami.yml
+```
+
+Choose **Run workflow**, provide a release version such as `v1.0.0` or a commit identifier, and start it. The workflow runs three dependent jobs:
+
+1. **Validate Packer** checks the version, initializes Packer, checks formatting, and validates `infrastructure-live-v1/packer`.
+2. **Build AMI** assumes `gha-packer`, runs Packer in `eu-central-1`, and publishes the AMI ID.
+3. **Verify AMI** waits for the AMI to become available and displays its architecture and block-device mappings.
+
+Wait for all three jobs to pass before applying the application infrastructure. The AMI workflow does not automatically run Terraform apply.
+
+### 6. Apply the development infrastructure
+
+In GitHub, open **Actions → Terraform apply** and choose **Run workflow**. This workflow is defined at:
+
+```text
+.github/workflows/infrastructure_apply.yml
+```
+
+The workflow uses:
+
+```text
+Working directory: infrastructure-live-v1/dev
+Variable file:     infrastructure-live-v1/dev/dev.tfvars
+Region:            eu-central-1
+Terraform version: 1.11.0
+```
+
+It assumes `gha-terraform`, initializes the encrypted S3 backend, formats and validates Terraform, runs TFLint and Checkov, creates a saved plan, and applies that plan. The ACM watcher may publish a DNS validation CNAME to the job summary while the apply is running.
+
+If the workflow waits for ACM validation, leave the apply running and continue to the DNS step. Do not expose the secret values printed or supplied to the workflow.
+
+### 7. Add the DNS records reported by the workflow
+
+After Terraform creates the certificate and CloudFront distribution, open the **Terraform apply** job summary or run:
+
+```text
+.github/workflows/dns_records.yml
+```
+
+To run the reporting workflow, open **Actions → DNS records**, choose **Run workflow**, select `dev`, and start it. The workflow assumes `gha-terraform`, reads the deployment configuration from SSM, looks up the ACM certificate in `us-east-1`, and prints:
+
+1. The ACM validation CNAME.
+2. The website CNAME pointing to the CloudFront distribution.
+
+Create both records manually in your DNS provider with **DNS only** enabled. This workflow reports records; it does not modify Cloudflare or any other DNS provider.
+
+After the ACM record is created, wait for the certificate to become `ISSUED`. Then create the website CNAME and test the public domain over HTTPS.
+
+### 8. Deploy the backend
+
+Open **Actions → Backend - Build and Deploy**, choose **Run workflow**, select `dev`, and start it. The workflow is:
+
+```text
+.github/workflows/build_ship_deploy_backend.yml
+```
+
+It assumes `gha-backend-deploy`, reads deployment values from SSM, packages the backend with production dependencies, uploads a versioned artifact to S3, starts CodeDeploy, and waits for deployment success. CodeDeploy then runs the lifecycle scripts in:
+
+```text
+scripts/
+appspec.yml
+```
+
+The validation hook checks the backend readiness endpoint before the deployment is considered successful.
+
+### 9. Release the frontend
+
+Open **Actions → Frontend - Build and Release**, choose **Run workflow**, select `dev`, and start it. The workflow is:
+
+```text
+.github/workflows/build_ship_deploy_frontend.yml
+```
+
+It builds `frontend/`, stamps the selected version into `version.txt`, archives the build, uploads an immutable version prefix to the frontend bucket, updates the CloudFront KeyValueStore pointer, and verifies that the public site serves the requested version.
+
+Run this after the backend is available and the public DNS/HTTPS path is working.
+
+### 10. Use rollback only when required
+
+For a frontend rollback, open **Actions → Frontend - Rollback** and enter the full release version or commit SHA to restore. The workflow is:
+
+```text
+.github/workflows/rollback_frontend.yml
+```
+
+It checks whether the version exists in the frontend bucket. If it does not, the workflow restores the archived frontend bundle from the artifacts bucket, then switches the CloudFront version pointer and verifies `version.txt`. It does not rebuild the frontend.
+
+Backend deployment rollback is handled by CodeDeploy when a deployment fails. Review the CodeDeploy deployment status before manually starting another backend deployment.
+
+### 11. Destroy the development environment only intentionally
+
+The destructive workflow is:
+
+```text
+.github/workflows/infrastructure_destroy.yml
+```
+
+Open **Actions → Terraform destroy**, choose **Run workflow**, enter the exact confirmation value `destroy-dev`, and decide whether to enable the `delete_amis` option.
+
+- With `delete_amis` disabled, Terraform destroys the development infrastructure but leaves Packer AMIs and snapshots.
+- With `delete_amis` enabled, the workflow also deregisters project-tagged AMIs and deletes their associated EBS snapshots.
+
+The workflow removes the application bucket policy before destruction so Terraform can empty the bucket, lists remaining resources tagged `Project=mern`, and reminds you to remove the website DNS CNAME before a future rebuild. It does not automatically delete DNS records.
 
 For the detailed engineering explanation, see the [published project case study](https://abdullahsameh.tech/blog/mern).
