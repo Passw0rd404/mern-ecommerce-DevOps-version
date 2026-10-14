@@ -5,7 +5,7 @@ import crypto from "crypto";
 
 const REGION = process.env.AWS_REGION;
 const BUCKET = process.env.S3_BUCKET_NAME;
-// Public base URL of the site, for example https://dev.abdullahsameh.tech
+// Public base URL of the site, supplied through the environment for each deployment.
 const CDN_URL = (process.env.CLOUDFRONT_URL || "").replace(/\/+$/, "");
 
 // fail at startup instead of at the first upload

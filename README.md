@@ -4,6 +4,8 @@ An e-commerce application with a React storefront, an Express/MongoDB backend, a
 
 [Read the full project case study](https://abdullahsameh.tech/blog/mern)
 
+[Read the project prerequisites](./PREREQUISITES.md)
+
 ![E-Commerce storefront and stack](./diagrams/mern-aws.png)
 
 ## Technologies and features
